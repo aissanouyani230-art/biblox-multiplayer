@@ -11,14 +11,27 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
+// Fichier exact du jeu
 const GAME_FILE = "BIBLOX_mobile_Xbox(1).html";
+const GAME_PATH = path.join(__dirname, GAME_FILE);
 
 app.use(express.static(__dirname));
 
+// Page principale
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, GAME_FILE));
+  res.sendFile(GAME_PATH, (err) => {
+    if (err) {
+      console.error("Erreur de chargement du jeu :", err.message);
+      if (!res.headersSent) {
+        res.status(404).send(
+          `Fichier introuvable : ${GAME_FILE}`
+        );
+      }
+    }
+  });
 });
 
+// Vérification du serveur
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -70,6 +83,7 @@ function leaveGame(socket) {
 io.on("connection", socket => {
   console.log("Joueur connecté :", socket.id);
 
+  // Rejoindre une partie
   socket.on("joinGame", data => {
     if (!data) return;
 
@@ -99,6 +113,7 @@ io.on("connection", socket => {
     socket.join(room);
     players.set(socket.id, player);
 
+    // Envoyer les joueurs déjà présents
     socket.emit(
       "players",
       [...players.values()]
@@ -106,15 +121,21 @@ io.on("connection", socket => {
         .map(publicPlayer)
     );
 
-    socket.to(room).emit("playerJoined", publicPlayer(player));
+    // Prévenir les autres joueurs
+    socket.to(room).emit(
+      "playerJoined",
+      publicPlayer(player)
+    );
 
     console.log(username + " rejoint " + game);
   });
 
+  // Quitter une partie
   socket.on("leaveGame", () => {
     leaveGame(socket);
   });
 
+  // Synchroniser les déplacements
   socket.on("move", position => {
     const player = players.get(socket.id);
     if (!player || !position) return;
@@ -136,9 +157,18 @@ io.on("connection", socket => {
     });
   });
 
+  // Mettre à jour le skin
   socket.on("updateSkin", skin => {
     const player = players.get(socket.id);
-    if (!player || !skin || typeof skin !== "object") return;
+
+    if (
+      !player ||
+      !skin ||
+      typeof skin !== "object" ||
+      Array.isArray(skin)
+    ) {
+      return;
+    }
 
     player.skin = skin;
 
@@ -148,6 +178,7 @@ io.on("connection", socket => {
     });
   });
 
+  // Chat entre joueurs de la même partie
   socket.on("sendChatMessage", data => {
     const player = players.get(socket.id);
     if (!player || !data) return;
@@ -164,12 +195,14 @@ io.on("connection", socket => {
     });
   });
 
+  // Déconnexion
   socket.on("disconnect", () => {
     leaveGame(socket);
     console.log("Joueur déconnecté :", socket.id);
   });
 });
 
+// Démarrage du serveur
 const PORT = process.env.PORT || 10000;
 
 server.listen(PORT, "0.0.0.0", () => {
