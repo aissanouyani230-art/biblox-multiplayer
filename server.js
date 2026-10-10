@@ -11,9 +11,7 @@ const io = new Server(server, {
 
 const players = new Map();
 
-app.get("/", (req, res) => {
-  res.send("BIBLOX multiplayer est en ligne !");
-});
+app.use(express.static(__dirname));
 
 io.on("connection", (socket) => {
   console.log("Joueur connecté :", socket.id);
