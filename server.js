@@ -1,53 +1,82 @@
-
 const express = require("express");
 const http = require("http");
+const path = require("path");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-const players = new Map();
+// Afficher le jeu BIBLOX depuis index.html
+app.use(express.static(path.join(__dirname)));
 
-app.use(express.static(__dirname));
+// Vérifier que le serveur fonctionne
+app.get("/health", (req, res) => {
+  res.status(200).send("BIBLOX multiplayer est en ligne !");
+});
+
+// Joueurs connectés
+const players = new Map();
 
 io.on("connection", (socket) => {
   console.log("Joueur connecté :", socket.id);
 
-  socket.on("joinGame", ({ username, game }) => {
-    if (!username || !game) return;
+  socket.on("joinGame", (data) => {
+    if (!data || !data.username || !data.game) return;
 
-    socket.data.username = String(username).slice(0, 20);
-    socket.data.game = String(game).slice(0, 50);
+    const oldPlayer = players.get(socket.id);
 
-    socket.join(socket.data.game);
+    if (oldPlayer) {
+      socket.leave(oldPlayer.game);
+      socket.to(oldPlayer.game).emit("playerLeft", {
+        id: socket.id
+      });
+      players.delete(socket.id);
+    }
 
-    players.set(socket.id, {
+    const username = String(data.username).slice(0, 20);
+    const game = String(data.game).slice(0, 50);
+
+    socket.data.username = username;
+    socket.data.game = game;
+    socket.join(game);
+
+    const player = {
       id: socket.id,
-      username: socket.data.username,
-      game: socket.data.game,
+      username,
+      game,
       x: 0,
       y: 0,
       z: 0,
       skin: {}
-    });
+    };
 
-    socket.emit("players", [...players.values()].filter(
-      p => p.game === socket.data.game && p.id !== socket.id
-    ));
+    players.set(socket.id, player);
 
-    socket.to(socket.data.game).emit("playerJoined", players.get(socket.id));
+    socket.emit(
+      "players",
+      [...players.values()].filter(
+        (p) => p.game === game && p.id !== socket.id
+      )
+    );
+
+    socket.to(game).emit("playerJoined", player);
   });
 
   socket.on("move", (position) => {
     const player = players.get(socket.id);
+
     if (!player || !position) return;
 
     for (const key of ["x", "y", "z"]) {
       if (Number.isFinite(position[key])) {
-        player[key] = Math.max(-10000, Math.min(10000, position[key]));
+        player[key] = Math.max(
+          -10000,
+          Math.min(10000, position[key])
+        );
       }
     }
 
@@ -61,9 +90,13 @@ io.on("connection", (socket) => {
 
   socket.on("updateSkin", (skin) => {
     const player = players.get(socket.id);
-    if (!player || !skin || typeof skin !== "object") return;
+
+    if (!player || !skin || typeof skin !== "object") {
+      return;
+    }
 
     player.skin = skin;
+
     socket.to(player.game).emit("skinUpdated", {
       id: socket.id,
       skin: player.skin
@@ -72,15 +105,21 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     const player = players.get(socket.id);
+
     if (player) {
-      io.to(player.game).emit("playerLeft", { id: socket.id });
+      io.to(player.game).emit("playerLeft", {
+        id: socket.id
+      });
+
       players.delete(socket.id);
     }
+
+    console.log("Joueur déconnecté :", socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, "0.0.0.0", () => {
   console.log("BIBLOX prêt sur le port", PORT);
 });
-    
