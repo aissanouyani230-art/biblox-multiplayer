@@ -47,7 +47,6 @@ function publicPlayer(player) {
 
 function leaveGame(socket) {
   const player = players.get(socket.id);
-
   if (!player) return;
 
   socket.to(player.room).emit("playerLeft", {
@@ -56,7 +55,6 @@ function leaveGame(socket) {
 
   socket.leave(player.room);
   players.delete(socket.id);
-
   socket.emit("gameLeft");
 }
 
@@ -71,7 +69,6 @@ io.on("connection", socket => {
 
     if (!username || !game) return;
 
-    // Quitter la partie précédente avant d'en rejoindre une autre.
     leaveGame(socket);
 
     const room = getRoom(game);
@@ -90,7 +87,6 @@ io.on("connection", socket => {
     socket.data.username = username;
     socket.data.game = game;
     socket.join(room);
-
     players.set(socket.id, player);
 
     socket.emit(
@@ -111,7 +107,6 @@ io.on("connection", socket => {
 
   socket.on("move", position => {
     const player = players.get(socket.id);
-
     if (!player || !position) return;
 
     for (const key of ["x", "y", "z"]) {
@@ -133,7 +128,6 @@ io.on("connection", socket => {
 
   socket.on("updateSkin", skin => {
     const player = players.get(socket.id);
-
     if (!player || !skin || typeof skin !== "object") return;
 
     player.skin = skin;
@@ -144,7 +138,6 @@ io.on("connection", socket => {
     });
   });
 
-  // Chat visible par les joueurs de la même partie.
   socket.on("sendChatMessage", data => {
     const player = players.get(socket.id);
     if (!player || !data) return;
