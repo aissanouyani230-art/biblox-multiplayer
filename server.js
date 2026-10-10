@@ -13,8 +13,6 @@ const io = new Server(server, {
 // Fichier du jeu
 const GAME_FILE = "BIBLOX_index_corrige.html";
 
-app.use(express.static(__dirname));
-
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, GAME_FILE));
 });
