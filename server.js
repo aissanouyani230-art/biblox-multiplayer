@@ -11,7 +11,7 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-const GAME_FILE = "BIBLOX_mobile_Xbox.html";
+const GAME_FILE = "BIBLOX_mobile_Xbox(1).html";
 
 app.use(express.static(__dirname));
 
