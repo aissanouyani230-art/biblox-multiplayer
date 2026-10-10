@@ -1,4 +1,3 @@
-
 const express = require("express");
 const http = require("http");
 const path = require("path");
@@ -21,41 +20,50 @@ app.get("/health", (req, res) => {
   res.status(200).send("BIBLOX multiplayer est en ligne !");
 });
 
-// Joueurs actuellement dans une partie
 const players = new Map();
 
-function cleanText(value, maxLength = 200) {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, maxLength);
+function cleanText(value, maxLength = 180) {
+  return String(value ?? "")
+    .replace(/[<>]/g, "")
+    .trim()
+    .slice(0, maxLength);
 }
 
-function gameRoom(game) {
-  return "game:" + game.trim().toLowerCase();
+function getRoom(game) {
+  return "game:" + cleanText(game, 50).toLowerCase();
 }
 
-function leaveCurrentGame(socket) {
+function publicPlayer(player) {
+  return {
+    id: player.id,
+    username: player.username,
+    game: player.game,
+    x: player.x,
+    y: player.y,
+    z: player.z,
+    skin: player.skin
+  };
+}
+
+function leaveGame(socket) {
   const player = players.get(socket.id);
+
   if (!player) return;
 
-  const room = player.room;
-
-  // Prévenir les autres joueurs de la même salle
-  socket.to(room).emit("playerLeft", {
+  socket.to(player.room).emit("playerLeft", {
     id: socket.id
   });
 
-  socket.leave(room);
+  socket.leave(player.room);
   players.delete(socket.id);
 
-  socket.data.game = null;
-  socket.data.room = null;
+  socket.emit("gameLeft");
 }
 
-io.on("connection", (socket) => {
-  console.log("Connexion :", socket.id);
+io.on("connection", socket => {
+  console.log("Joueur connecté :", socket.id);
 
-  // Rejoindre un jeu
-  socket.on("joinGame", (data) => {
+  socket.on("joinGame", data => {
     if (!data) return;
 
     const username = cleanText(data.username, 20);
@@ -63,10 +71,10 @@ io.on("connection", (socket) => {
 
     if (!username || !game) return;
 
-    // Éviter de rester dans l'ancienne partie
-    leaveCurrentGame(socket);
+    // Quitter la partie précédente avant d'en rejoindre une autre.
+    leaveGame(socket);
 
-    const room = gameRoom(game);
+    const room = getRoom(game);
 
     const player = {
       id: socket.id,
@@ -81,33 +89,27 @@ io.on("connection", (socket) => {
 
     socket.data.username = username;
     socket.data.game = game;
-    socket.data.room = room;
-
     socket.join(room);
+
     players.set(socket.id, player);
 
-    // Envoyer les joueurs déjà présents dans CE jeu
     socket.emit(
       "players",
       [...players.values()]
         .filter(p => p.room === room && p.id !== socket.id)
-        .map(({ room, ...p }) => p)
+        .map(publicPlayer)
     );
 
-    // Annoncer l'arrivée aux autres joueurs
-    socket.to(room).emit("playerJoined", player);
+    socket.to(room).emit("playerJoined", publicPlayer(player));
 
-    console.log(username, "a rejoint", game);
+    console.log(username + " rejoint " + game);
   });
 
-  // Quitter le jeu et revenir au menu
   socket.on("leaveGame", () => {
-    leaveCurrentGame(socket);
-    console.log("Retour au menu :", socket.id);
+    leaveGame(socket);
   });
 
-  // Déplacements
-  socket.on("move", (position) => {
+  socket.on("move", position => {
     const player = players.get(socket.id);
 
     if (!player || !position) return;
@@ -129,13 +131,10 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Apparence du personnage
-  socket.on("updateSkin", (skin) => {
+  socket.on("updateSkin", skin => {
     const player = players.get(socket.id);
 
-    if (!player || !skin || typeof skin !== "object") {
-      return;
-    }
+    if (!player || !skin || typeof skin !== "object") return;
 
     player.skin = skin;
 
@@ -145,39 +144,26 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Chat : le serveur choisit le nom et la salle
-  socket.on("sendChatMessage", (data) => {
+  // Chat visible par les joueurs de la même partie.
+  socket.on("sendChatMessage", data => {
     const player = players.get(socket.id);
     if (!player || !data) return;
 
-    const message = cleanText(data.message, 300);
+    const message = cleanText(data.message, 180);
     if (!message) return;
 
     io.to(player.room).emit("chatMessage", {
+      id: socket.id,
       username: player.username,
-      message,
       game: player.game,
+      message,
       timestamp: Date.now()
     });
   });
 
-  // Recherche parmi les joueurs actuellement en ligne
-  socket.on("findOnlineAccount", (data, callback) => {
-    const username = cleanText(data?.username, 20).toLowerCase();
-
-    const found = [...players.values()].some(
-      p => p.username.toLowerCase() === username
-    );
-
-    if (typeof callback === "function") {
-      callback({ found });
-    }
-  });
-
-  // Déconnexion
   socket.on("disconnect", () => {
-    leaveCurrentGame(socket);
-    console.log("Déconnexion :", socket.id);
+    leaveGame(socket);
+    console.log("Joueur déconnecté :", socket.id);
   });
 });
 
