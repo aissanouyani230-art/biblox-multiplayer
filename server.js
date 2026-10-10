@@ -10,10 +10,13 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
+// Fichier du jeu
+const GAME_FILE = "BIBLOX_index_corrige.html";
+
 app.use(express.static(__dirname));
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.sendFile(path.join(__dirname, GAME_FILE));
 });
 
 app.get("/health", (req, res) => {
@@ -86,6 +89,7 @@ io.on("connection", socket => {
 
     socket.data.username = username;
     socket.data.game = game;
+
     socket.join(room);
     players.set(socket.id, player);
 
@@ -96,7 +100,10 @@ io.on("connection", socket => {
         .map(publicPlayer)
     );
 
-    socket.to(room).emit("playerJoined", publicPlayer(player));
+    socket.to(room).emit(
+      "playerJoined",
+      publicPlayer(player)
+    );
 
     console.log(username + " rejoint " + game);
   });
