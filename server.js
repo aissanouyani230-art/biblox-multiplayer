@@ -1,3 +1,4 @@
+
 const express = require("express");
 const http = require("http");
 const path = require("path");
@@ -10,15 +11,22 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-// Fichier du jeu
-const GAME_FILE = "BIBLOX_index_corrige.html";
+const GAME_FILE = "BIBLOX_mobile_Xbox.html";
+
+app.use(express.static(__dirname));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, GAME_FILE));
 });
 
 app.get("/health", (req, res) => {
-  res.status(200).send("BIBLOX multiplayer est en ligne !");
+  res.status(200).json({
+    status: "ok",
+    game: "BIBLOX",
+    multiplayer: true,
+    mobile: true,
+    xboxController: true
+  });
 });
 
 const players = new Map();
@@ -98,10 +106,7 @@ io.on("connection", socket => {
         .map(publicPlayer)
     );
 
-    socket.to(room).emit(
-      "playerJoined",
-      publicPlayer(player)
-    );
+    socket.to(room).emit("playerJoined", publicPlayer(player));
 
     console.log(username + " rejoint " + game);
   });
@@ -165,7 +170,7 @@ io.on("connection", socket => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log("BIBLOX prêt sur le port", PORT);
