@@ -10,8 +10,13 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-// Afficher le jeu BIBLOX depuis index.html
-app.use(express.static(path.join(__dirname)));
+// Afficher les fichiers du jeu BIBLOX
+app.use(express.static(__dirname));
+
+// Ouvrir index.html à la page d'accueil
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
 
 // Vérifier que le serveur fonctionne
 app.get("/health", (req, res) => {
@@ -24,16 +29,20 @@ const players = new Map();
 io.on("connection", (socket) => {
   console.log("Joueur connecté :", socket.id);
 
+  // Connexion à une partie
   socket.on("joinGame", (data) => {
     if (!data || !data.username || !data.game) return;
 
+    // Retirer le joueur de son ancienne partie
     const oldPlayer = players.get(socket.id);
 
     if (oldPlayer) {
       socket.leave(oldPlayer.game);
+
       socket.to(oldPlayer.game).emit("playerLeft", {
         id: socket.id
       });
+
       players.delete(socket.id);
     }
 
@@ -56,6 +65,7 @@ io.on("connection", (socket) => {
 
     players.set(socket.id, player);
 
+    // Envoyer les joueurs déjà présents
     socket.emit(
       "players",
       [...players.values()].filter(
@@ -63,9 +73,11 @@ io.on("connection", (socket) => {
       )
     );
 
+    // Prévenir les autres joueurs
     socket.to(game).emit("playerJoined", player);
   });
 
+  // Synchroniser les déplacements
   socket.on("move", (position) => {
     const player = players.get(socket.id);
 
@@ -88,6 +100,7 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Synchroniser l'apparence
   socket.on("updateSkin", (skin) => {
     const player = players.get(socket.id);
 
@@ -103,6 +116,7 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Déconnexion d'un joueur
   socket.on("disconnect", () => {
     const player = players.get(socket.id);
 
@@ -118,6 +132,7 @@ io.on("connection", (socket) => {
   });
 });
 
+// Démarrer le serveur
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, "0.0.0.0", () => {
