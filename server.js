@@ -1,3 +1,4 @@
+
 const express = require("express");
 const http = require("http");
 const path = require("path");
@@ -10,74 +11,102 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-// Afficher les fichiers du jeu BIBLOX
 app.use(express.static(__dirname));
 
-// Ouvrir index.html à la page d'accueil
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Vérifier que le serveur fonctionne
 app.get("/health", (req, res) => {
   res.status(200).send("BIBLOX multiplayer est en ligne !");
 });
 
-// Joueurs connectés
+// Joueurs actuellement dans une partie
 const players = new Map();
 
+function cleanText(value, maxLength = 200) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+}
+
+function gameRoom(game) {
+  return "game:" + game.trim().toLowerCase();
+}
+
+function leaveCurrentGame(socket) {
+  const player = players.get(socket.id);
+  if (!player) return;
+
+  const room = player.room;
+
+  // Prévenir les autres joueurs de la même salle
+  socket.to(room).emit("playerLeft", {
+    id: socket.id
+  });
+
+  socket.leave(room);
+  players.delete(socket.id);
+
+  socket.data.game = null;
+  socket.data.room = null;
+}
+
 io.on("connection", (socket) => {
-  console.log("Joueur connecté :", socket.id);
+  console.log("Connexion :", socket.id);
 
-  // Connexion à une partie
+  // Rejoindre un jeu
   socket.on("joinGame", (data) => {
-    if (!data || !data.username || !data.game) return;
+    if (!data) return;
 
-    // Retirer le joueur de son ancienne partie
-    const oldPlayer = players.get(socket.id);
+    const username = cleanText(data.username, 20);
+    const game = cleanText(data.game, 50);
 
-    if (oldPlayer) {
-      socket.leave(oldPlayer.game);
+    if (!username || !game) return;
 
-      socket.to(oldPlayer.game).emit("playerLeft", {
-        id: socket.id
-      });
+    // Éviter de rester dans l'ancienne partie
+    leaveCurrentGame(socket);
 
-      players.delete(socket.id);
-    }
-
-    const username = String(data.username).slice(0, 20);
-    const game = String(data.game).slice(0, 50);
-
-    socket.data.username = username;
-    socket.data.game = game;
-    socket.join(game);
+    const room = gameRoom(game);
 
     const player = {
       id: socket.id,
       username,
       game,
+      room,
       x: 0,
       y: 0,
       z: 0,
       skin: {}
     };
 
+    socket.data.username = username;
+    socket.data.game = game;
+    socket.data.room = room;
+
+    socket.join(room);
     players.set(socket.id, player);
 
-    // Envoyer les joueurs déjà présents
+    // Envoyer les joueurs déjà présents dans CE jeu
     socket.emit(
       "players",
-      [...players.values()].filter(
-        (p) => p.game === game && p.id !== socket.id
-      )
+      [...players.values()]
+        .filter(p => p.room === room && p.id !== socket.id)
+        .map(({ room, ...p }) => p)
     );
 
-    // Prévenir les autres joueurs
-    socket.to(game).emit("playerJoined", player);
+    // Annoncer l'arrivée aux autres joueurs
+    socket.to(room).emit("playerJoined", player);
+
+    console.log(username, "a rejoint", game);
   });
 
-  // Synchroniser les déplacements
+  // Quitter le jeu et revenir au menu
+  socket.on("leaveGame", () => {
+    leaveCurrentGame(socket);
+    console.log("Retour au menu :", socket.id);
+  });
+
+  // Déplacements
   socket.on("move", (position) => {
     const player = players.get(socket.id);
 
@@ -92,7 +121,7 @@ io.on("connection", (socket) => {
       }
     }
 
-    socket.to(player.game).emit("playerMoved", {
+    socket.to(player.room).emit("playerMoved", {
       id: socket.id,
       x: player.x,
       y: player.y,
@@ -100,7 +129,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Synchroniser l'apparence
+  // Apparence du personnage
   socket.on("updateSkin", (skin) => {
     const player = players.get(socket.id);
 
@@ -110,29 +139,48 @@ io.on("connection", (socket) => {
 
     player.skin = skin;
 
-    socket.to(player.game).emit("skinUpdated", {
+    socket.to(player.room).emit("skinUpdated", {
       id: socket.id,
       skin: player.skin
     });
   });
 
-  // Déconnexion d'un joueur
-  socket.on("disconnect", () => {
+  // Chat : le serveur choisit le nom et la salle
+  socket.on("sendChatMessage", (data) => {
     const player = players.get(socket.id);
+    if (!player || !data) return;
 
-    if (player) {
-      io.to(player.game).emit("playerLeft", {
-        id: socket.id
-      });
+    const message = cleanText(data.message, 300);
+    if (!message) return;
 
-      players.delete(socket.id);
+    io.to(player.room).emit("chatMessage", {
+      username: player.username,
+      message,
+      game: player.game,
+      timestamp: Date.now()
+    });
+  });
+
+  // Recherche parmi les joueurs actuellement en ligne
+  socket.on("findOnlineAccount", (data, callback) => {
+    const username = cleanText(data?.username, 20).toLowerCase();
+
+    const found = [...players.values()].some(
+      p => p.username.toLowerCase() === username
+    );
+
+    if (typeof callback === "function") {
+      callback({ found });
     }
+  });
 
-    console.log("Joueur déconnecté :", socket.id);
+  // Déconnexion
+  socket.on("disconnect", () => {
+    leaveCurrentGame(socket);
+    console.log("Déconnexion :", socket.id);
   });
 });
 
-// Démarrer le serveur
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, "0.0.0.0", () => {
