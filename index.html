@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Keyboard Escape</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:system-ui,Arial,sans-serif;touch-action:none}
+  canvas{display:block}
+  #hud{display:none;position:fixed;left:12px;top:12px;z-index:5;color:white;text-shadow:0 2px 4px #173047;font-weight:800;pointer-events:none}
+  #title{font-size:clamp(18px,4vw,26px);margin-bottom:5px}
+  #objective{font-size:clamp(12px,2.8vw,15px);background:#102a43b8;padding:8px 11px;border-radius:12px;max-width:min(82vw,360px)}
+  #status{font-size:13px;margin-top:6px}
+  #help{display:none;position:fixed;top:12px;right:12px;z-index:5;color:#fff;text-shadow:0 2px 4px #173047;font-size:12px;text-align:right;pointer-events:none}
+  #controls{position:fixed;inset:0;z-index:10;pointer-events:none;display:none}
+  #stickBase{position:absolute;left:22px;bottom:24px;width:126px;height:126px;border-radius:50%;background:#102a4355;border:3px solid #ffffffaa;pointer-events:auto;touch-action:none}
+  #stick{position:absolute;width:54px;height:54px;left:33px;top:33px;border-radius:50%;background:#f7fbffdd;border:3px solid #fff;box-shadow:0 3px 10px #0003;pointer-events:none}
+  #jump{position:absolute;right:24px;left:auto;bottom:48px;width:94px;height:94px;border-radius:50%;border:3px solid #fff;background:#ffb703;color:#402900;font-size:17px;font-weight:1000;box-shadow:0 5px 0 #c77b00;pointer-events:auto;touch-action:none}
+  #jump:active{transform:translateY(3px);box-shadow:0 2px 0 #c77b00}
+  #banner{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);z-index:20;text-align:center;display:none;background:#102a43ed;color:white;padding:22px 25px;border:3px solid #fff;border-radius:20px;box-shadow:0 10px 35px #0005;width:min(88vw,390px)}
+  #banner h2{margin:0 0 8px;font-size:27px}
+  #banner p{margin:0 0 16px}
+  #restart{border:0;border-radius:12px;background:#80ed99;color:#123;font-size:16px;font-weight:900;padding:12px 18px}
+  #desktopHint{display:none;position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:white;text-shadow:0 2px 4px #173047;font-size:11px;z-index:4;white-space:nowrap;pointer-events:none}
+  @media(min-width:800px){#stickBase{width:140px;height:140px}#stick{left:39px;top:39px}#jump{width:100px;height:100px;right:28px;left:auto;bottom:54px}}
+  @media(max-width:380px){#jump{right:18px;left:auto;width:82px;height:82px;bottom:48px}}
+  #loadingScreen{display:none;position:fixed;inset:0;z-index:100;background:linear-gradient(145deg,#101827 0%,#202b3a 55%,#111827 100%);color:#fff;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:Arial,system-ui,sans-serif}
+  #loadingCard{width:min(92vw,460px);padding:22px;border-radius:22px;background:#071b36b8;border:2px solid #ffffff55;box-shadow:0 18px 55px #00152d77}
+  #loadingArt{height:190px;border-radius:15px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:linear-gradient(180deg,#303b4c 0%,#596477 45%,#32734b 46%,#1e5635 100%);position:relative;margin-bottom:18px}
+  #loadingArt:before{content:"";position:absolute;left:0;right:0;bottom:0;height:65px;background:repeating-linear-gradient(90deg,#368f4c 0 48px,#2b7f40 48px 96px)}
+  #loadingAvatar{font-size:74px;filter:drop-shadow(0 7px 0 #173047);z-index:1}
+  #loadingTitle{font-size:27px;font-weight:1000;margin:8px 0}
+  #loadingSubtitle{opacity:.9;margin-bottom:18px}
+  #loadingTrack{height:12px;border-radius:99px;background:#ffffff38;overflow:hidden}
+  #loadingProgress{height:100%;width:0;background:#80ed99;border-radius:99px;transition:width .12s linear}
+  #loadingPercent{font-weight:800;font-size:13px;margin-top:9px}
+  #quitGame{position:fixed;right:12px;top:12px;z-index:25;display:none;border:1px solid #ffffffaa;border-radius:10px;background:#15202dcc;color:#fff;font-weight:900;font-size:14px;padding:10px 13px;box-shadow:0 3px 10px #0004}
+  #quitConfirm{display:none;position:fixed;inset:0;z-index:110;background:#061629bb;align-items:center;justify-content:center;padding:20px}
+  #quitCard{background:#fff;color:#202227;width:min(90vw,340px);padding:22px;border-radius:18px;text-align:center;box-shadow:0 15px 45px #0005}
+  #quitCard h2{margin:0 0 8px}
+  #quitCard p{color:#555;margin:0 0 18px}
+  .quitChoice{border:0;border-radius:10px;padding:11px 16px;font-weight:900;margin:4px}
+  #quitYes{background:#e53935;color:#fff} #quitNo{background:#e8edf2;color:#202227}
+
+/* Orientation du GUI : accueil vertical, jeu horizontal sur mobile */
+@media (orientation: portrait) and (max-width: 900px) {
+  #homeScreen { overflow-y:auto; }
+  #homeScreen .homeContent, #homeScreen .mainContent, #homeScreen .contentWrap {
+    width:100%; max-width:100%; box-sizing:border-box;
+  }
+  #homeScreen .gameGrid, #homeScreen .gamesGrid, #homeScreen .recommendations {
+    grid-template-columns:1fr !important;
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  #homeScreen { overflow-y:auto; }
+  #homeScreen .gameGrid, #homeScreen .gamesGrid, #homeScreen .recommendations {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+  #controls { touch-action:none; }
+}
+#orientationNotice {
+  display:none; position:fixed; inset:0; z-index:120; background:#101827f2; color:white;
+  align-items:center; justify-content:center; text-align:center; padding:24px;
+  font:700 18px Arial,sans-serif;
+}
+#orientationNotice .noticeCard { max-width:320px; }
+#orientationNotice .rotateIcon { font-size:58px; margin-bottom:12px; }
+
+
+body.game-mode #hud { max-width:100vw; }
+@media (orientation: landscape) and (max-height: 600px) {
+  body.game-mode #hud { transform:scale(.82); transform-origin:top left; }
+  body.game-mode #help { max-width:38vw; }
+}
+
+
+#accountQuickButton{position:fixed;top:12px;left:12px;z-index:140;border:0;border-radius:999px;padding:10px 14px;background:#fff;color:#20242a;font-weight:900;box-shadow:0 4px 15px #0002;display:block}
+#accountModal{position:fixed;inset:0;z-index:150;display:none;align-items:center;justify-content:center;padding:18px;background:#101827c9;font-family:Arial,system-ui,sans-serif}
+#accountModalCard{width:min(100%,390px);max-height:90vh;overflow:auto;background:#fff;color:#222;border-radius:18px;padding:23px;box-shadow:0 18px 50px #0005}
+#accountModalCard h2{margin:0 0 8px}
+#accountModalCard p{font-size:13px;color:#626875;line-height:1.45}
+.accountField{display:block;width:100%;margin:7px 0 13px;padding:12px;border:1px solid #ccd1d9;border-radius:9px;font-size:15px}
+.accountAction{width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;font-weight:900;background:#335fff;color:#fff}
+#accountClose{background:#edf0f4;color:#222}
+#accountStatus{font-size:13px;font-weight:700;min-height:18px;margin-top:10px}
+
+
+  /* Éléments inspirés de la vidéo : base verte, bâtiments, lasers et menu d'actions */
+  #gameExtraHud{display:none;position:fixed;left:12px;top:118px;z-index:6;gap:8px;flex-direction:column;pointer-events:none}
+  #gameExtraHud .extraPill{background:#15202dcc;border:2px solid #ffffffbb;border-radius:10px;color:#fff;padding:7px 9px;font-size:12px;font-weight:900;text-shadow:0 1px 2px #000;box-shadow:0 3px 8px #0003}
+  body.game-mode #gameExtraHud{display:flex}
+  @media(max-width:600px){#gameExtraHud{top:112px;left:8px;gap:5px}#gameExtraHud .extraPill{font-size:10px;padding:6px 7px}}
+
+
+  /* Interface sombre et profil visible uniquement pendant la partie */
+  #gameExtraHud{display:none!important}
+  #gameProfileTag{display:none;position:fixed;top:12px;right:12px;z-index:8;background:#11151fee;color:#f3f4f6;border:1px solid #3b4252;border-radius:12px;padding:9px 13px;font:800 13px Arial,sans-serif;box-shadow:0 8px 24px #0008}
+  body.game-mode #gameProfileTag{display:block}
+  #accountQuickButton{background:#191d27;color:#f4f4f5;border:1px solid #3b4252;box-shadow:0 4px 18px #0006}
+  #accountModalCard,#signupCard{background:#171b24!important;color:#f3f4f6!important;border:1px solid #343b4b!important;box-shadow:0 18px 55px #0009!important}
+  #accountModalCard p,#signupIntro,.tinySub,.gameMeta{color:#a3aab8!important}
+  .accountField,.signupInput{background:#0d1119!important;color:#f5f6fa!important;border:1px solid #3a4355!important}
+  .signupLabel{color:#e5e7eb}
+  #accountClose{background:#303746!important;color:#f3f4f6!important}
+  #homeScreen{background:#0f1219!important;color:#f3f4f6!important}
+  #homeTop,#homeBottom{background:#171b24!important;color:#f3f4f6!important;border-color:#303746!important}
+  #homeMenuIcon,#robloxWord,.homeSectionTitle,#profileName{color:#f3f4f6!important}
+  #homeSearch{background:#0d1119!important;color:#f3f4f6!important;border-color:#3a4355!important}
+  .friend{color:#d2d6df!important}.friendFace{border-color:#303746!important}
+  .quickAction,.gameCard{background:#1a202b!important;color:#f3f4f6!important;border-color:#303746!important}
+  .quickIcon{background:#2b3342!important}
+  .navItem{color:#a4adbd!important}.navItem.active{color:#fff!important}
+  #sidePanelInner{background:#171b24!important;color:#f3f4f6!important}
+  .sideLink{background:#202633!important;color:#f3f4f6!important}
+  #signupScreen{background:#0c0f15!important;color:#f3f4f6!important}
+  #signupError{background:#3a1c24!important;color:#ffb4bc!important}
+
+
+  #accountChooser{width:min(100%,430px);background:#0c0f15;color:#f3f4f6;border-radius:18px;padding:25px 23px}
+  #accountChooser h1{font-size:34px;text-align:center;margin:5px 0 55px;font-weight:1000}
+  #accountList{min-height:150px;max-height:42vh;overflow:auto;background:#171b24;border-radius:20px;padding:12px;margin-bottom:18px}
+  .savedAccount{display:flex;align-items:center;gap:12px;padding:12px 8px}
+  .savedAvatar{width:58px;height:58px;border-radius:50%;background:#282d3a;display:grid;place-items:center;font-size:30px;flex-shrink:0}
+  .savedInfo{min-width:0;flex:1}.savedName{font-size:18px;font-weight:900;overflow-wrap:anywhere}.savedHandle{font-size:13px;color:#a3aab8;margin-top:3px}
+  .savedLogout{border:0;border-radius:8px;padding:10px 12px;background:#303746;color:#f3f4f6;font-weight:800}
+  .switchAccountBtn{width:100%;border:0;border-radius:12px;padding:16px 12px;margin-top:10px;background:#292a32;color:#f3f4f6;font-size:16px}
+  #chooserLogin{display:none}
+  #chooserLogin .signupInput{margin-bottom:5px}
+  #chooserError{display:none;color:#ffb4bc;background:#3a1c24;padding:10px;border-radius:8px;margin-top:10px;font-size:13px}
+  body.has-session #accountQuickButton{display:none!important}
+
+
+  #chatToggle{display:none;position:fixed;left:18px;right:auto;top:72px;z-index:35;border:2px solid #fff;border-radius:14px;background:#17253ddd;color:#fff;font-weight:900;padding:10px 14px;box-shadow:0 3px 12px #0004;pointer-events:auto;touch-action:manipulation}
+  #chatPanel{display:none;position:fixed;left:12px;right:auto;top:118px;z-index:36;width:min(320px,78vw);height:min(330px,48vh);background:#111827ed;color:#fff;border:1px solid #ffffff55;border-radius:15px;box-shadow:0 8px 24px #0006;pointer-events:auto;overflow:hidden;flex-direction:column;touch-action:auto}
+  #chatHeader{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:#263449;font-weight:900}
+  #chatClose{border:0;border-radius:8px;padding:4px 9px;font-weight:900}
+  #chatMessages{flex:1;overflow-y:auto;padding:9px;display:flex;flex-direction:column;gap:6px;font-size:13px;overflow-wrap:anywhere;touch-action:pan-y}
+  .chatLine{background:#fff;color:#172033;padding:8px 10px;border-radius:12px;align-self:flex-start;max-width:95%;box-shadow:0 2px 5px #0002}
+  .chatLine b{color:#5266b8;margin-right:5px}
+  #avatarChatBubble{display:none;position:fixed;z-index:34;left:50%;top:30%;transform:translate(-50%,-100%);max-width:min(260px,65vw);padding:8px 12px;border-radius:14px;background:rgba(255,255,255,.72);color:#172033;font-size:14px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;box-shadow:0 2px 8px #0002;pointer-events:none;text-align:center;backdrop-filter:blur(2px)}
+  #avatarChatBubble:after{content:"";position:absolute;left:calc(50% - 7px);bottom:-7px;width:14px;height:14px;background:rgba(255,255,255,.72);transform:rotate(45deg);z-index:-1}
+  #chatForm{display:flex;gap:6px;padding:8px;border-top:1px solid #ffffff22}
+  #chatInput{min-width:0;flex:1;border:0;border-radius:8px;padding:9px;font-size:14px;touch-action:auto;user-select:text}
+  #chatSend{border:0;border-radius:8px;background:#54d6a0;color:#102018;font-weight:900;padding:0 11px}
+  #chatToggle.chatVisible{display:block}
+
+/* Interface de jeu épurée : garder seulement le titre, quitter, chat et commandes */
+body.game-mode #title,
+body.game-mode #objective,
+body.game-mode #status,
+body.game-mode #help,
+body.game-mode #gameExtraHud,
+body.game-mode #gameProfileTag,
+body.game-mode #desktopHint { display:none !important; }
+body.game-mode #hud { left:12px; top:12px; max-width:calc(100vw - 150px); }
+body.game-mode #title { display:none !important; }
+body.game-mode #chatToggle { top:58px; left:12px; }
+  #avatarEditor{display:none;position:fixed;inset:0;z-index:90;background:#11131bee;color:#f4f6fb;font-family:Arial,system-ui,sans-serif;overflow:auto;padding:10px}
+  #avatarEditorCard{width:min(100%,760px);min-height:calc(100dvh - 20px);margin:0 auto;background:#f5f6f8;color:#252832;border:1px solid #3a3d47;border-radius:18px;overflow:hidden;box-shadow:0 18px 50px #0008;display:flex;flex-direction:column}
+  #avatarEditorTop{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;background:#fff;border-bottom:1px solid #e0e2e8}
+  #avatarEditorTop h2{margin:0;font-size:20px;color:#242630}
+  #avatarEditorClose{border:0;border-radius:10px;background:#e9ebf0;color:#252832;padding:10px 13px;font-weight:900}
+  #avatarPreview{height:clamp(245px,38vh,360px);flex-shrink:0;margin:0;background:radial-gradient(ellipse at 50% 30%,#e7eaf0,#c7cbd4 78%);overflow:hidden;position:relative;touch-action:pan-y}
+  #avatarPreview:after{content:'Fais glisser pour tourner ton avatar';position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#646a76;font-size:11px;pointer-events:none}
+  #avatarPreview canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+  #avatarEditorIntro{margin:0;padding:10px 14px;color:#686e7a;font-size:12px;background:#fff}
+  #avatarCategoryTabs{display:flex;gap:0;overflow-x:auto;background:#fff;border-bottom:1px solid #dfe2e8;scrollbar-width:none}
+  .avatarTab{flex:0 0 auto;border:0;border-bottom:3px solid transparent;background:#fff;color:#5e6370;padding:13px 14px;font-size:13px;font-weight:800}
+  .avatarTab.active{color:#20232b;border-bottom-color:#335fff}
+  #avatarItems{padding:12px;min-height:150px;flex:1}
+  .avatarGroup{display:none;margin:0}.avatarGroup.active{display:block}.avatarGroup h3{font-size:15px;margin:0 0 10px;color:#303440}
+  .avatarChoices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+  .avatarChoice{min-width:0;min-height:94px;border:2px solid #e0e3e9;background:#fff;color:#303440;border-radius:12px;padding:8px 5px;font-weight:750;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:12px;box-shadow:0 1px 2px #00008}
+  .avatarChoice:before{content:attr(data-icon);font-size:29px;line-height:1.1;min-height:31px}
+  .avatarChoice.selected{background:#eef2ff;border-color:#335fff;box-shadow:0 0 0 1px #335fff inset;color:#1f3eb8}
+  #avatarSave{margin:10px 12px 12px;border:0;border-radius:12px;background:#335fff;color:white;padding:15px;font-size:16px;font-weight:1000;flex-shrink:0}
+  #avatarSaved{min-height:18px;margin:0 12px 8px;text-align:center;color:#25804c;font-size:12px}
+  @media(min-width:600px){#avatarEditor{padding:16px}#avatarEditorCard{min-height:0}#avatarEditorMain{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}#avatarPreview{height:360px}#avatarItems{max-height:360px;overflow:auto}.avatarChoices{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+
+<style>
+  #homeScreen{display:none;position:fixed;inset:0;z-index:30;background:#f2f4f7;color:#202227;font-family:Arial,system-ui,sans-serif;overflow:auto;display:flex;flex-direction:column}
+  #homeScreen *{box-sizing:border-box}
+  #homeTop{height:58px;display:flex;align-items:center;gap:12px;padding:0 15px;background:#fff;border-bottom:1px solid #ddd;flex-shrink:0}
+  #homeMenuIcon{font-size:23px;border:0;background:transparent;color:#333;padding:3px}
+  #robloxWord{font-weight:1000;letter-spacing:-1px;font-size:21px;color:#17191d}
+  #homeSearch{margin-left:auto;width:min(42vw,230px);border:1px solid #d4d7dc;background:#f5f6f8;border-radius:9px;padding:9px 10px;font-size:13px}
+  #homeMain{width:min(100%,760px);margin:0 auto;padding:16px 14px 86px;flex:1}
+  #profileRow{display:flex;align-items:center;gap:10px;margin:2px 0 20px}
+  .profilePic{width:39px;height:39px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#c6d6ff,#6c8fe8);font-size:23px}
+  #profileName{font-size:15px;font-weight:800}
+  .tinySub{font-size:11px;color:#6e727b;margin-top:3px}
+  .homeSectionTitle{font-size:17px;font-weight:800;margin:18px 0 12px}
+  #friendsRow{display:flex;gap:15px;overflow-x:auto;padding:2px 0 7px}
+  .friend{flex:0 0 72px;text-align:center;font-size:11px;color:#454951;cursor:pointer}
+  .friendFace{width:57px;height:57px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;font-size:27px;background:#dce4f5;border:2px solid #fff;box-shadow:0 1px 4px #0001;position:relative}
+  .friendFace.isOnline:after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;background:#25c46a;border:2px solid white;right:0;bottom:0}
+  #friendJoinPopup{display:none;position:fixed;z-index:240;left:50%;top:50%;transform:translate(-50%,-50%);width:min(340px,88vw);background:#171c27;color:white;border:1px solid #394257;border-radius:18px;padding:18px;box-shadow:0 15px 60px #0009;text-align:center}
+  #friendJoinPopup .bigFriendFace{font-size:54px;width:90px;height:90px;border-radius:50%;display:grid;place-items:center;margin:8px auto;background:#303d56;border:3px solid #5e7197}
+  #friendJoinPopup button{border:0;border-radius:10px;padding:11px 14px;margin:6px;font-weight:800;background:#3c78ff;color:white}
+  #friendJoinPopup button.secondary{background:#394254}
+  .onlineDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#19bd70;margin-left:3px}
+  #homeQuickActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 20px}
+  .quickAction{background:#fff;border:1px solid #e2e4e8;border-radius:13px;padding:13px 10px;display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700}
+  .quickIcon{width:36px;height:36px;border-radius:50%;background:#e9edf5;display:grid;place-items:center;font-size:19px}
+  #recommendGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .gameCard{min-width:0;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e1e3e7;box-shadow:0 1px 3px #00000008}
+  .gameArt{height:112px;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;color:white;font-size:19px;font-weight:1000;line-height:1.1;text-shadow:0 2px 3px #0007;background:linear-gradient(140deg,#008cff,#1dd6ba 45%,#ffcf42)}
+  .gameArt.art2{background:linear-gradient(140deg,#ff79b0,#ffca74 48%,#8d65f7)}
+  .gameArt.art3{background:linear-gradient(140deg,#2dca6f,#b5e85c 50%,#1689d8)}
+  .gameArt.art4{background:linear-gradient(140deg,#252d60,#ed4d9b 55%,#ffad43)}
+  .gameInfo{padding:9px 10px 11px}
+  .gameName{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gameMeta{font-size:11px;color:#777;margin-top:5px}
+  #playGame,.playGameBtn{width:100%;margin-top:9px;border:0;border-radius:9px;padding:10px;background:#335fff;color:#fff;font-size:14px;font-weight:900}
+  #homeBottom{position:fixed;bottom:0;left:0;right:0;height:64px;background:#fff;border-top:1px solid #dfe1e5;display:flex;justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom);z-index:32}
+  .navItem{flex:1;border:0;background:transparent;color:#676b74;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .navItem span{font-size:20px}
+  .navItem.active{color:#222}
+  #sidePanel{display:none;position:fixed;z-index:35;inset:0;background:#0006}
+  #sidePanelInner{width:min(82vw,310px);height:100%;background:#fff;padding:20px 16px;box-shadow:5px 0 25px #0002}
+  #sidePanelInner h3{margin:8px 0 20px}
+  .sideLink{display:block;width:100%;text-align:left;padding:13px 8px;border:0;border-radius:9px;background:white;font-size:15px;color:#30343a}
+  .sideLink:active{background:#eee}
+  @media(min-width:600px){#recommendGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.gameArt{height:135px}}
+</style>
+
+<style>
+  #signupScreen{position:fixed;inset:0;z-index:50;background:#f2f4f7;color:#202227;font-family:Arial,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
+  #signupCard{width:min(100%,430px);background:#fff;border:1px solid #e1e3e7;border-radius:18px;padding:25px 23px;box-shadow:0 8px 35px #15223b12}
+  #signupBrand{font-size:25px;font-weight:1000;letter-spacing:-1px;margin-bottom:7px}
+  #signupIntro{color:#666c76;font-size:14px;line-height:1.45;margin:0 0 19px}
+  .signupLabel{display:block;font-size:13px;font-weight:800;margin:13px 0 6px}
+  .signupInput{width:100%;border:1px solid #cfd3da;border-radius:9px;padding:12px;font-size:15px;background:#fff;color:#202227}
+  .signupInput:focus{outline:2px solid #335fff55;border-color:#335fff}
+  #signupSubmit{width:100%;margin-top:19px;background:#202227;color:white;border:0;border-radius:10px;padding:13px;font-size:15px;font-weight:900}
+  #signupError{display:none;margin-top:12px;color:#b42318;background:#fff0ee;padding:10px;border-radius:8px;font-size:13px;line-height:1.4}
+  #signupNote{font-size:11px;color:#777d87;line-height:1.45;margin-top:13px}
+  .friendsEmpty{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e1e3e7;border-radius:12px;padding:13px}
+  .emptyFriendsIcon{width:43px;height:43px;display:grid;place-items:center;border-radius:50%;background:#edf0f5;color:#5d6572;font-size:25px}
+  #addFriendButton{margin-left:auto;border:0;border-radius:8px;background:#e8ebf0;padding:9px 12px;font-weight:800;color:#252a32}
+</style>
+
+<button id="accountQuickButton">👤 Connexion</button>
+<div id="accountModal" role="dialog" aria-modal="true" aria-label="Connexion au compte">
+  <form id="accountModalCard">
+    <h2>Connexion</h2>
+    <p>Profil de démonstration enregistré sur cet appareil uniquement. Il n’y a pas encore de vrai serveur ni de compte Roblox.</p>
+    <label class="signupLabel" for="accountUsername">Nom d’utilisateur</label>
+    <input class="accountField" id="accountUsername" autocomplete="username" required maxlength="24" placeholder="Ton pseudo">
+    <label class="signupLabel" for="accountPassword">Mot de passe</label>
+    <input class="accountField" id="accountPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="8 caractères minimum">
+    <button class="accountAction" type="submit">Se connecter</button>
+    <button class="accountAction" id="accountCreate" type="button">Créer / enregistrer ce profil</button>
+    <button class="accountAction" id="accountClose" type="button">Fermer</button>
+    <div id="accountStatus" aria-live="polite"></div>
+  </form>
+</div>
+
+<div id="signupScreen">
+  <section id="accountChooser">
+    <h1>◇ ROBLOX</h1>
+    <h2 style="font-size:22px;margin:0 0 18px">Tous les comptes <span style="float:right;font-size:15px">Gérer</span></h2>
+    <div id="accountList"></div>
+    <button class="switchAccountBtn" id="chooseOtherAccount" type="button">Se connecter à un autre compte</button>
+    <button class="switchAccountBtn" id="chooseCreateAccount" type="button">Créer un compte</button>
+    <div id="chooserLogin">
+      <h2 id="chooserLoginTitle">Se connecter</h2>
+      <label class="signupLabel" for="chooserUsername">Pseudo</label>
+      <input class="signupInput" id="chooserUsername" autocomplete="username" required placeholder="Ton pseudo">
+      <label class="signupLabel" for="chooserPassword">Mot de passe</label>
+      <input class="signupInput" id="chooserPassword" type="password" autocomplete="current-password" required placeholder="Ton mot de passe">
+      <div id="chooserError" role="alert"></div>
+      <button class="switchAccountBtn" id="chooserLoginSubmit" type="button">Se connecter</button>
+      <button class="switchAccountBtn" id="chooserBack" type="button">Retour</button>
+    </div>
+  </section>
+  <form id="signupCard" style="display:none">
+    <div id="signupBrand">◇ ROBLOX</div>
+    <h2 style="font-size:22px;margin:0 0 8px">Créer un compte</h2>
+    <p id="signupIntro">Crée ton profil pour commencer l’aventure.</p>
+    <label class="signupLabel" for="signupUsername">Identifiant</label>
+    <input class="signupInput" id="signupUsername" name="username" autocomplete="username" minlength="3" maxlength="20" required placeholder="Choisis un identifiant">
+    <label class="signupLabel" for="signupBirth">Date de naissance</label>
+    <input class="signupInput" id="signupBirth" name="birthdate" type="date" required>
+    <label class="signupLabel" for="signupPassword">Mot de passe</label>
+    <input class="signupInput" id="signupPassword" name="password" type="password" autocomplete="new-password" minlength="8" required placeholder="8 caractères minimum">
+    <label class="signupLabel" for="signupConfirm">Confirmer le mot de passe</label>
+    <input class="signupInput" id="signupConfirm" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required placeholder="Réécris le même mot de passe">
+    <div id="signupError" role="alert"></div>
+    <button id="signupSubmit" type="submit">CRÉER MON COMPTE</button>
+    <div id="signupNote">Prototype local : ce formulaire ne crée pas de vrai compte en ligne. N’utilise pas ton vrai mot de passe. Les informations saisies ne sont pas envoyées à un serveur.</div>
+  </form>
+</div>
+
+<div id="loadingScreen" aria-live="polite">
+  <div id="loadingCard">
+    <div id="loadingArt"><div id="loadingAvatar">🧍</div></div>
+    <div id="loadingTitle">KEYBOARD ESCAPE</div>
+    <div id="loadingSubtitle">Préparation de ton aventure...</div>
+    <div id="loadingTrack"><div id="loadingProgress"></div></div>
+    <div id="loadingPercent">Chargement : 0%</div>
+  </div>
+</div>
+
+<div id="orientationNotice">
+  <div class="noticeCard">
+    <div class="rotateIcon">📱 ↻</div>
+    <div>Tourne ton téléphone à l’horizontale pour jouer !</div>
+  </div>
+</div>
+<div id="quitConfirm">
+  <div id="quitCard">
+    <h2>Quitter l’expérience ?</h2>
+    <p>Tu retourneras à l’accueil du jeu.</p>
+    <button class="quitChoice" id="quitYes">Quitter</button>
+    <button class="quitChoice" id="quitNo">Continuer</button>
+  </div>
+</div>
+<button id="quitGame" aria-label="Quitter le jeu">☰ Quitter</button>
+
+<div id="homeScreen">
+  <header id="homeTop">
+    <button id="homeMenuIcon" aria-label="Ouvrir le menu">☰</button>
+    <div id="robloxWord">◇ ROBLOX</div>
+    <input id="homeSearch" placeholder="Rechercher" aria-label="Rechercher un jeu">
+  </header>
+  <main id="homeMain">
+    <div id="profileRow">
+      <div class="profilePic">😎</div>
+      <div><div id="profileName">Mon joueur</div><div class="tinySub">Bienvenue dans Roblox !</div></div>
+    </div>
+    <div class="homeSectionTitle">Amis</div>
+    <div id="friendsRow" class="friendsEmpty">
+      <div class="emptyFriendsIcon">♧</div>
+      <div><strong>Pas encore d’amis</strong><div class="tinySub">Tes amis apparaîtront ici quand tu en ajouteras.</div></div>
+      <button id="addFriendButton">Ajouter</button>
+    </div>
+    <div id="homeQuickActions">
+      <button class="quickAction" data-panel="Ajouter des amis"><span class="quickIcon">👥</span><span>Ajouter des amis</span></button>
+      <button class="quickAction" data-panel="Partager un jeu"><span class="quickIcon">▦</span><span>Partager un jeu</span></button>
+    </div>
+    <div class="homeSectionTitle">Recommandé pour toi</div>
+    <div id="recommendGrid">
+      <div class="gameCard"><div class="gameArt art2">🥚<br>STEAL A EGG</div><div class="gameInfo"><div class="gameName">Steal a Egg</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="Steal a Egg">JOUER</button></div></div>
+      <div class="gameCard"><div class="gameArt art3">⌨️<br>KEYBOARD ESCAPE</div><div class="gameInfo"><div class="gameName">KEYBOARD Escape</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="KEYBOARD Escape">JOUER</button></div></div>
+      <div class="gameCard"><div class="gameArt art4">🪝<br>SWING OBBY</div><div class="gameInfo"><div class="gameName">Swing Obby for Brainrots</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="Swing Obby for Brainrots">JOUER</button></div></div>
+      <div class="gameCard"><div class="gameArt">🧱<br>BLOCK ADVENTURE</div><div class="gameInfo"><div class="gameName">Block Adventure 3D</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="Block Adventure 3D">JOUER</button></div></div>
+      <div class="gameCard"><div class="gameArt art2">🌈<br>OBBY COLORÉ</div><div class="gameInfo"><div class="gameName">Obby coloré</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="Obby coloré">JOUER</button></div></div>
+      <div class="gameCard"><div class="gameArt art3">🌳<br>SURVIE</div><div class="gameInfo"><div class="gameName">Survie en nature</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="Survie en nature">JOUER</button></div></div>
+      <div class="gameCard"><div class="gameArt art4">⚡<br>SUPER AVENTURE</div><div class="gameInfo"><div class="gameName">Super aventure</div><div class="gameMeta">Sol et murs · Map vide</div><button class="playGameBtn" data-game="Super aventure">JOUER</button></div></div>
+    </div>
+  </main>
+  <nav id="homeBottom">
+    <button class="navItem active" data-nav="Accueil"><span>⌂</span>Accueil</button>
+    <button class="navItem" data-nav="Découvrir"><span>◈</span>Découvrir</button>
+    <button class="navItem" data-nav="Avatar"><span>♟</span>Avatar</button>
+    <button class="navItem" data-nav="Chat"><span>▤</span>Chat</button>
+  </nav>
+</div>
+<div id="sidePanel"><div id="sidePanelInner"><button class="sideLink" id="closePanel">✕ Fermer</button><h3>Menu</h3><button class="sideLink" data-panel="Accueil">⌂ Accueil</button><button class="sideLink" data-panel="Profil">♟ Profil</button><button class="sideLink" data-panel="Amis">♧ Amis</button><button class="sideLink" data-panel="Paramètres">⚙ Paramètres</button><button class="sideLink" id="menuDisconnect">↪ Déconnexion</button><button class="sideLink" id="menuSwitchAccount">👤 Se connecter à un autre compte</button></div></div>
+
+
+<style>
+#friendsModal{display:none;position:fixed;inset:0;z-index:220;background:#080b12d9;color:#f4f6fb;align-items:center;justify-content:center;padding:14px;font-family:Arial,system-ui,sans-serif}
+#friendsCard{width:min(620px,100%);max-height:90vh;overflow:auto;background:#171c27;border:1px solid #343c4d;border-radius:18px;padding:18px;box-shadow:0 20px 70px #0008}
+#friendsCard h2{margin:0 0 6px}#friendsCard .muted{color:#aab3c3;font-size:13px}#friendsClose{float:right;background:#303849;color:#fff;border:0;border-radius:9px;padding:9px 12px}
+#friendSearch{box-sizing:border-box;width:100%;margin:14px 0 10px;padding:13px;border-radius:10px;border:1px solid #414b60;background:#0e1320;color:#fff;font-size:16px}
+.friendResult,.friendRow{display:flex;align-items:center;gap:12px;padding:12px;margin:8px 0;background:#222a39;border-radius:12px}.friendAvatar{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:#465575;font-size:22px;flex-shrink:0}.friendText{flex:1;min-width:0}.friendText strong{display:block;overflow-wrap:anywhere}.friendAction{border:0;border-radius:9px;background:#3c78ff;color:#fff;padding:10px 12px;font-weight:800}.friendAction.secondary{background:#394254}.friendSection{margin-top:20px;font-weight:800}.friendNotice{padding:12px;border-radius:10px;background:#222a39;color:#cbd4e3;margin-top:8px}
+</style>
+<div id="friendsModal" role="dialog" aria-modal="true" aria-label="Amis">
+ <div id="friendsCard"><button id="friendsClose">✕ Fermer</button><h2>👥 Amis</h2><div class="muted">Recherche des joueurs, envoie des demandes et accepte celles que tu reçois.</div>
+ <input id="friendSearch" type="search" placeholder="Rechercher un pseudo…" autocomplete="off">
+ <div id="friendSearchResults"><div class="friendNotice">Tape un pseudo pour rechercher un profil.</div></div>
+ <div class="friendSection">📩 Demandes reçues</div><div id="incomingRequests"></div>
+ <div class="friendSection">📤 Demandes envoyées</div><div id="outgoingRequests"></div>
+ <div class="friendSection">♧ Mes amis</div><div id="myFriendsList"></div>
+ <div class="muted" style="margin-top:16px">Les comptes sont enregistrés sur cet appareil. Les demandes ne sont pas envoyées à d’autres téléphones.</div>
+ </div>
+</div>
+
+<div id="avatarEditor" role="dialog" aria-modal="true" aria-label="Personnaliser mon avatar">
+  <div id="avatarEditorCard">
+    <div id="avatarEditorTop"><h2>Personnaliser l’avatar</h2><button id="avatarEditorClose" type="button">✕ Fermer</button></div>
+    <div id="avatarPreview" aria-label="Aperçu 3D de mon avatar"></div>
+    <p id="avatarEditorIntro">Choisis un article comme dans Roblox : ton avatar change tout de suite. Fais glisser l’aperçu pour le tourner.</p>
+    <div id="avatarCategoryTabs" role="tablist">
+      <button class="avatarTab active" data-tab="hairStyle">Cheveux</button><button class="avatarTab" data-tab="hat">Chapeaux</button><button class="avatarTab" data-tab="accessory">Accessoires</button><button class="avatarTab" data-tab="arms">Corps</button><button class="avatarTab" data-tab="legs">Jambes</button>
+    </div>
+    <div id="avatarItems">
+      <div class="avatarGroup active" data-group="hairStyle"><h3>Choisir une coiffure</h3><div class="avatarChoices" data-choice="hairStyle"><button class="avatarChoice" data-value="classic" data-icon="💜">Cheveux classiques</button><button class="avatarChoice" data-value="spiky" data-icon="⚡">Hérissés</button><button class="avatarChoice" data-value="long" data-icon="💇">Cheveux longs</button><button class="avatarChoice" data-value="none" data-icon="🚫">Aucun</button></div></div>
+      <div class="avatarGroup" data-group="hat"><h3>Chapeaux et couvre-chefs</h3><div class="avatarChoices" data-choice="hat"><button class="avatarChoice" data-value="none" data-icon="🚫">Aucun</button><button class="avatarChoice" data-value="cap" data-icon="🧢">Casquette</button><button class="avatarChoice" data-value="crown" data-icon="👑">Couronne</button><button class="avatarChoice" data-value="wizard" data-icon="🧙">Chapeau magique</button></div></div>
+      <div class="avatarGroup" data-group="accessory"><h3>Accessoires à essayer</h3><div class="avatarChoices" data-choice="accessory"><button class="avatarChoice" data-value="none" data-icon="🚫">Aucun</button><button class="avatarChoice" data-value="glasses" data-icon="🕶️">Lunettes</button><button class="avatarChoice" data-value="wings" data-icon="🪽">Ailes</button><button class="avatarChoice" data-value="backpack" data-icon="🎒">Sac à dos</button></div></div>
+      <div class="avatarGroup" data-group="arms"><h3>Forme des bras</h3><div class="avatarChoices" data-choice="arms"><button class="avatarChoice" data-value="normal" data-icon="🧍">Classiques</button><button class="avatarChoice" data-value="short" data-icon="🙆">Courts</button><button class="avatarChoice" data-value="long" data-icon="🦾">Longs</button></div></div>
+      <div class="avatarGroup" data-group="legs"><h3>Jambes et chaussures</h3><div class="avatarChoices" data-choice="legs"><button class="avatarChoice" data-value="normal" data-icon="👖">Classiques</button><button class="avatarChoice" data-value="short" data-icon="🩳">Courtes</button><button class="avatarChoice" data-value="boots" data-icon="🥾">Grosses bottes</button></div></div>
+    </div>
+    <button id="avatarSave" type="button">✓ Enregistrer mon avatar</button><div id="avatarSaved" aria-live="polite"></div>
+  </div>
+</div>
+<div id="gameProfileTag" aria-live="polite">👤 <span id="gameProfileName">Invité</span></div>
+<div id="hud">
+  <div id="title">⌨️ KEYBOARD ESCAPE</div>
+  <div id="objective">Traverse le parcours de touches géantes, gagne de la vitesse et atteins la ligne d’arrivée !</div>
+  <div id="status">Touches : <span id="count">0</span>/10 · Atteins l’arrivée !</div>
+</div>
+<div id="help">Cours sur les touches<br>Saute et évite la lave !</div>
+
+</div>
+<div id="controls">
+  <div id="stickBase" aria-label="Joystick de déplacement"><div id="stick"></div></div>
+  <button id="jump" aria-label="Sauter">SAUTER</button>
+</div>
+<button id="chatToggle" type="button" aria-expanded="false">💬 CHAT</button>
+<div id="avatarChatBubble" aria-live="polite"></div>
+<div id="chatPanel" role="dialog" aria-label="Chat du jeu">
+ <div id="chatHeader"><span>💬 Chat</span><button id="chatClose" type="button" aria-label="Fermer le chat">✕</button></div>
+ <div id="chatMessages" aria-live="polite"><div class="chatLine">Bienvenue dans le chat !</div></div>
+ <form id="chatForm"><input id="chatInput" type="text" maxlength="180" autocomplete="off" placeholder="Écris un message…" aria-label="Message"/><button id="chatSend" type="submit">Envoyer</button></form>
+</div>
+<div id="desktopHint">PC : WASD/flèches pour bouger · Espace pour sauter · glisse pour tourner la caméra</div>
+<audio id="jumpAudio" preload="auto" src="data:audio/mpeg;base64,SUQzBAAAAAAAIlRTU0UAAAAOAAADTGF2ZjYxLjcuMTAzAAAAAAAAAAAAAAD/88DAAAAAAAAAAAAASW5mbwAAAA8AAAAOAAAYfAAiIiIiIiIiMzMzMzMzM0RERERERERVVVVVVVVVZmZmZmZmZnd3d3d3d3eIiIiIiIiImZmZmZmZmZmqqqqqqqqqu7u7u7u7u8zMzMzMzMzd3d3d3d3d7u7u7u7u7v////////8AAAAATGF2YzYxLjE5AAAAAAAAAAAAAAAAJANpAAAAAAAAGHy2kCLEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/88DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/88LEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//PCxAAAAANIAUAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf+D0JiUgkd/0MAEbjQy09nH/wcGO2fj6kCR/8AwfRvBwLOCrY7MugaI+fxw2tq7Ngmk1O+ziqd5/+YeBhbQvQYCAhnlumX2IcQPhvJXf3v+BgIpYXzBIFCAeayVRtQ1GlC0ZSAhmg0f/Of/mCweYPA6FbNG5snZkJOIycQDJY1ATNM6gEx8WDPYY/vf//5wAAIvQsOxZHwwWCwUE4Wu8xgKzSZPMHC8xcXjCwFMJAELFgILJm0i/zn///3//4lSmBgYYQBCkAABAcBG0Ljqbv28JdcOdYYFTHZEMeBgDEQzCCTIwDZ0ZwUxsgkGGx6YEA5hEQc5///e///zn+XTMP/zwsT/aCQV3AGb4AAwCSgTrMDAJPiMGAQCEAOIGGQiAgejmxPN/zNAwMmHwwsawxhmikcaoFhgMFGO0iGHZGwxKJzMITMLBYiQYkajBQM/+9///nP/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"></audio>
+<audio id="walkAudio" preload="auto" loop src="data:audio/mpeg;base64,SUQzBAAAAAABIVRYWFgAAAASAAADbWFqb3JfYnJhbmQAbXA0MgBUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzb21tcDQyAFRYWFgAAAAYAAADY29tLmFuZHJvaWQudmVyc2lvbgAxMgBUU1NFAAAADgAAA0xhdmY2MS43LjEwMwAAAAAAAAAAAAAA//OAwAAAAAAAAAAAAEluZm8AAAAPAAAAewAAZTgABggKDBASFBYaHB4hIycpKy0xMzU3Oz0/QkRISkxOUlRWWFxeYWNlaWttb3N1d3l9f4KEhoqMjpCUlpianqGjpaerra+xtbe5u8DCxMbIzM7Q0tbY2tzh4+Xn6e3v8fP3+fv9AAAAAExhdmM2MS4xOQAAAAAAAAAAAAAAACQCgAAAAAAAAGU45yV0IwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/zgMQAAAADSAAAAABMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84LEOwAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zgsQ7AAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OCxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84LEOwAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zgsQ7AAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OCxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84LEOwAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVWRjmwZeY36AzmAlIUJtwZeWcxV5THbzGs52MdCab53LCnCKlQR669sCZwyO7GbSvYJxVap6Z34+sGvkP/zgsQ7AAAAAAAAAABLubGajHmDlDCRifhj4b0CjAmTlHFhiWQl2YfWODmY4n+5kl5OQaEsanGRTE5xj5AzGaWgcUGEKCLpgpgfAYF0FhmBWhdRgbwm6Y3mL4GnDNcBq3ggsaJsejGIuBd5gW4ZqYjORhGi8K4xoAAVAY/SLhmCwBdRgR4RuYD0EkmCChbBhTwe+YrSPYGp9MKRlUCSebU+lOmFAi6xgMASWYHGBEGEjAj5hm4P6YDQBzHQKi0dAYmgWsZvNLkWIyyddsCYHywn//OCxP9GIaCsIP6ZYBLEsn2OCYYK6HBgsqvXn9NXr35w4cbaWMIlQiqTCSgEhmSgimEGLuhBjyMAUJqGE4sdGw1OETT6kRxGtlkFNGcgI4wQuyBpiEKpi8ECsDXuFiGpCCUSwAQp3FkFuFu0ZgFBJc1AbWTvBPBcRaxJFCLgnTLUiGLBPzjbyEEbAFZTE4UIBOArkoJeo8VP9bVk2I7G5rsy28L822UcA7wwzCAWC8mWpBZwCggYsaYHoRok5ruDIr8NgthkgJZDh+ZWicTG4oT/84LEqk2UCawCxh5dnbmpzIU6rkTi5QvEOqfcz/QtvNNnV7x5qArKq9uOhnOdC1IdB7iHnMLgebeq4ifPRCICcdxMKyq4LgkS5uFNZuiCcMJpq0g6PPxUMbuVzneV+3k229UkHVSgofhkNbPm8Mv5xl0OBFmWkSdsyGOEBWLtC8w1MIQYllY3qvDyAhjic6FohGVQ+dgiq8PVDpIcfo9Y8ySK502F8nO+S7MyHeyE1QSnvDORnhqBoWnkW+1MyqdO6MsngIn1mAgwq+Mjo0he9P/zgsQ3J0tyBAB6RzEmiQjkylGKODUW0LW7/7Wz1s6uE8eo2SJm9YTJySYjNyBgQyb8AXBXQDS+wwjkQGCI8OONLEJK8rnL08rJZZpCmcUdD7P6cD2OmdrFnTmamQk+IxFJR1GDtCdCMM4YM4hVdWTy0QsqFkmw0xxMAvnyyqvAlDSyuUpBC1KRdkNSbkHxBbzlJUXatv7pybxW3WTqGXVR8m6icvD9iEtM3VpSbMCpNwkDDrJClltM+Y7/fOaS8V6v/32/xUbkfoPlXNN0l56n//OCxF0mHBYIFHpMNLVWFTUtXe8knsRGW/Ut3/i92v5Ia/bnrvCkIulYSWZd75vxslzGVeXVwXzyW4nCM3bav7e4uyDDU8YpdX8GbYyCClgaFQIxlaSDU5IF3xMokxUGSJoUNRqDXbMspnAXBCwa4JKJG6huJ2YTyxCZgLaPBj1NV848bBK2v5FUiu5Zi2SsvcdPsyJtkqZvr1P1Gt2Yj/HNpVPHvpP/3idlr3W1+3b/tgE6H58GTHqWw5i0r5ZxbFTn+Xk873DL/z5B+T6b7Rr/84LEiCZr1ggKekw9z/s7PCbdbO009G1RtiOLwZjqfUKpXEpNFijZmVCgeRx8oKTHmg6ahtqjWIAkIKyCqWFQIACAI6Z6kjohp0VEoUFA2NKoUIpCBcXOex42Cg/BuDcBcXF9DLLPHtLKWOIETauaq6c+XWpcs8XFxd4d1P7u4zESojdKIritPvrTa7tulS+Z7V59dOh02qNAzuuYbmsis9qiE9qf3d3qqnjSLcfbY5yJz+qoii1Pl0xBTUUzLjEwMKqqqqqqqqqqqqqqVqoQAf/zgsSyJoPyDAp5kHlaJQsaow8OJ+SVK5c+7Vou0JR9Rc80ubybP9AIijn3yRlocFIw1H1pG1MSSK8yiiaiRZ5kiASKMs786q4KASRIkvuRRNo6Hs0ibNFkTcfM7ZMzm0SU1Ekkq76OJJNuv01lHcFE3Qn8OHeF/IphbZ95hRsKCC+mX5L+IvwXvP/+Hf/Fyf51i3kydRAIABSQABQJygHBwAgqrGbLPwJCD1zTYyzcITQHTBkQ4eawwDoRVDJYEQtHyGzWxCReZAsVgEHkIlNg//OCxMgjGkYUFUwwARCISBBBgw4GYI3LuUyZKgHhY0HMklHBhM7MmqiVpmPl1F+CwBTN5zJjQhqZBKYIIVjZTEpi1GV/uRZhDtyNl5ixiHMOAIJVYELlhqWllV7eqkGPw5Egp52G5931blsyppK6GIyBpzlZxGGb1NTXaKmywo4YijLIi/b7uPkvdkEQZevKB1KYBQkocEAqITJkPhoVlldnaezyJXYd5KJ5kiAB2WDrzUvlC40hG0DAC+17qDyKKAgTAZhBYUJGIFipQBIzImH/84LE/1Ur/k2rmtABDMwwEKDQ46FRUOFtlp0Vao71bOrMzlHYr8v36sqdzGHJuXw/asVLGd6n7bqWKTfU5lU3Ugl+XqkLtPu/T6xiI0kuoJdGatFc5Zpe2Mcrt78/yxqUqKohRF67pNtuOf1AQwFuJqn09dOULiQNMrDIiELpFAENAMZdDdW4M6Z2wQAES/RQWNH2jrvaZEWZuysl/r0ZQTMOTlpX6ldFVk+n4lDoMmQlXl8ylzWBr1jNloTYYVCYi1SURqmWBbtAUgltWU23Fv/zgsRuPnsqRZ2YwAHc9Q1IzagZdL0wYt58776SeVWa1+DnSjGEaqRSA2w8pGtTU9M/OUsPQuxH3djkklb/S2apZua+Nw7NSeXRiQxLuVzPClrV8pzG9SRmSzsWlTzy2rRxbt99ZZ2zN3KsqmaWis25Vnq1W5fvSGxT7xvWOcr3sM8OY0F3h5hLQn1f2k7Xo//83u4SsQJiLb0qtuA3AKKY8w8VAy8ogYjOxCq7Gi9DLRrEBLwwjAyAKMLQwsrY1MUHRA6ALmBcBXNiibu7sDY+//OCxDgrTBJEAZiQADjJsxTWVkz6aKCKzhqgbm6ZppGdlJXrRL7kwMoOASmhTUZJs60W9aMXORMcDOgXCcK69K/qav/qUhzM+RQuGjkwXCDl8ysy1ILspV3VqqZFfV6aJFyuOYRQuHy4aG6dMzT///+///7KoIIG6b8vl83JwuGhu6qoKIYf8puQpvgYDIgaVbLVYZYmK5QTxJpbmr1BwSBbEaBpaxgJIYZNFawLavrHXegtTerWFTIcxhAQbIKl68WnTi4f6hl9L8XJDprTyxb/84LETiwLblGdmHgADmFWBaAW7Cefw9xVM9jQcPdV7bSidOV8rld3yug5zmuvjX9c5x/nb17bcL2tW3gsP/+P80tv/f+8ZxjOP+rYVrYhPq1r61/////////////////+nz7NWHefn/1gwnz7L2DVdtizO2oqglQJAish8rAYOq5aG1Sae9dzuJkQEoK9itzWlpK6f5Zw5CUyvWojGgAOqikMzqGTJqJv36sLW9eRx+uxaSon63SobrruWpf2ik1R177fVvbWYaffffam3XzIov/zgsRhJ5pGFAvYYAGs0/otn5nN+1//q/WdZjo5PTmW/ui2ONS6wNhQlk7FBtPFJmv+/8NfdX9tPX+N5npHdIVO19/M7JAd/+xviko3MyyWwpV2pmVEKpXHU9ZbtmHiqR7uaeMwKiHIzyuojLYIH0U5MgrWuDwG3IDQGMlNAgEh0V7Xkoenp5JWxIIzaAnOEjl1rRyZbgpFH50oy9+yWYvHTYrM1pSDdsfLhHcvbhb2PO5auxVCS5+tGmSOgWk0AScuWm+5HUlhh/6zF1i63WJq//OCxIYhUi4sHHmS7AoQQMKlqMk+C3EhJYA0luUbcsKtlKMgpDz1NtGE1L4dpmlhFATKDpFp9gVTGDIJNk4iA0KsEpd5tAWBIuqIzo2DJ4VEJ5HJcwk1F0DUQckgEqiY2WZb1SVwuLmzqAwCZ4PVBQhzFAvMUYVYdhtoLFeMbp91GP7Nk0lIv73i7f9teXQL7K913bfvP3as/+mrCLn29bGRz5adMBVMQU1FPILIdFrSwNlxHbX611gTaRiDXgn60NQCyqlafDs6s5yZM3eRR17/84LExCZ6PhQAekbxSHd1iFkaOiEBR5W1joGgCrGVx88BQFOJEINCywNMEw2TIChMNJHWGVl+iI08T6sYrozJWeFFGyFH0rjPYYUkwUWZm7OwiaKW98P5rfXW1r6USL2hzU2m7fWdJTqVZnbXl6yGtqqarT+rlD5bKuhBUJyIkI4ipTBjH7FozMsNz2sBLBNgIRdw1ih40AwKCEVbtVeHinTWZizRRSGpPD8RdlrVHQNaQVITGxeD04WrYbPnrignHKAcPF8sl0hFpEuaseKEIv/zgsTqK8O+CArCRx1R+cj0MjsLAPRFc9UE8vxHac7iWUdihhuhsOLKLsouTvXQ5sjgKx4ZZCBSEpULLTaVHGKsjVmpk0x8QdWm6meYxAICAhAEQPc+7dO97UTvbmf4h/wM3eYYQIFGHE+9nudMumnfPfV4ocfEOqUFEGRblwbOImJdUXfW2RCj7WmaTLtuY73b7eBCCoyRqj/FAUpG4BUVReiJOVPRpkz9WqfdFcdu1R1d24tTaqS3DP5/i6ib0lCyJAYEQ0SlTwzb244qvBWC//OCxP8xjAYACsMM3ZM8V6JNakPwhkGmmlprW0jV8kkO7GU7wig13oRlJWUewm0qJXHSW44kibYhFVkhksfRCoFgSFRMGSEMkLJLFtRFuagN6IKsl3omdWtG0U6LImqqukVU7jyjKO4lY7dt1fSXeD6cBFhiJaCfI5UJfSVEhRZuKNg10dn7YSJkjRI4clpKl+ZkolR51SuZAtULqAcG4FYjsBoig2MyCxhY9YqChFFJHbpPRnkT8UR00aMqWUAVblJqFyU3OP9WROWqB6RmLLP/84LE/DBcFfwKwk0cJMZEg4iQkSEDpEIJLHyps+Qwmttotr2y94hWRsiAjIEETS4+1ROK6DwfgWQo7YmSKn0utcrjlyWk7rJrJTLmysD+o1nTsjRrLyYQG22j3LzSkx2zLKR4xxoiVQtI3IOnSJmMaVxZm2ECySW6hptiyJqkcjhPspHV5qjSHalHw1fJ9f+D86C8rYSijaUZlakTM1IqWDRIlPTVDWjNFb7K6TdSKTVJcs1afOemVUpuFszjaJHNtNOiAoooina8DUX0kKWYoP/zgsT+MWQV9ArDEghKFdR8SCaSBqsirbtES1IelrMKts4iJVrbjUCUnD7bJRHguKFrJGd8UJhCqs5t+EJ6khypdJXHdONrZk1jbGrRIs1ZbzXRRMLzYgu+WpRRpMRMbM4rsGY5KSJqkTNb9moKCZx8yhQXiUOZTXKwQp0fT1NHAlYYtaCJJKEH+CpieZbEJl4rfadI+gCCADYnX6biIA6YglkzKi34CHZ+qkHJRpjmX8hJmoZmjSvrHJxmsl8zkSKM/sMwSUO72JAeQNfFwGZM//OCxPwwLBX4FVhIABgYyGH/v1CmchgDSvMoGAyGxTMIeNOlD//uqCQCwIbddBqYFGoT2YjNZggzGEgv/cO/rivL8OTmVJ0wwLTD4CJgqREUFAIMChhoCfv+Y4Yf+H577bwsXjAIXFgejegGMJAQcAiWIGAYJDPfz/8f/+f/Mpy9Wll6tFK1LF1/yAGgYaCiJqGyzRQAiEFEwNBRRMahExUKh0VAIC///z/7rn///8PufLXHbezD87P0jeUcOPJTPwDAUIA4OBUcBxgcUGFg6Yz/84LE/1TUFiDJnOAAwKGGcxUEDEIfFQmYCEggAZgIAjgIEIJ//////5/8//5//8CV8JHep4vy33//vf/PneGGAaNC4wsBkTAKAQYABUAJUqfKAMXwjd6Pwe7Tktu0NTSD6ggNZuylFUyBNSR0Rd0CDZ9Ho9L7rvRxYZvmtOUzpdTlONDzSV2lw2gMh5WzY8UlQIQCQEQIx8kgih5NiSa5KH5yZrBSdG0mmtOSbN97abuSPOSckbGtW513NR9PuHJNmfiNu01rNW/D29f+3btiHf/zgsRvJwquTA3YWADw+m/8PpyVxtmai+/hznOlEmgyGnRcFQ1xE+DMSnRFsU8jgqwlvSeClCKDovbVC3aLt0e8xkFxFpFiEgaaRLWfqPyFurX2jtedJuUzDkRl7dYTAFg1KHMNG2IgcQHwiElgwE4+RsoMSA8BQaJhCZxKKBzzw2S0uNHjjlSjqKUT1OtHjdYFFFxqWojD0yM4ykS3E6EM51w0dytc52NWmafWmJ6jvY63c3RZHRUdvUz+qjprre44u6r0n5/54/avrqI7mbp7//OCxJYoa7IsA1hAAHpY9jKEYHUXQY1sSpIJJAADAvAKsW3FlLegYEccEZAMYpcfLCYEcIAhiTZet42KmNDIjnAkuh+DK9IqUZ2PJlrgLbs7dYVQLvDqEAy9QJS9b7W5IAD51krLoHlkCvy66xjCAQSNmbO6rFVkpixm/Kq96v2lchrj8I/uy/y2VzQMiEvGb5VrY59WOy9Kxrj8MHd+TyBTVIluzEkvmErpeWEVqa1uzdvRrVelpJZLHLf+B12M4hD9xuHnuktO7MBSKUfdh3H/84LEuEcTwiTTmsgBs2ozEp3fMamV/Crdh+MSyxL8rvKe1QPpFHbcuL6po1GozEX1jUNOFGYZdG1Kn2q45f/d7/LWV3+ajEYnI3K5+WUlmN179j+U/csc+7synDnfl0arxWW3JdLruNn+3Eluv7kubypOsuoOhjhjjCKTEEp7pjAgVQAUALCwELUiZMwGJwoFMIRAIxDsUIxIaMAGatfUGUWUJPweAdKEn4SUR8IeCeI8uqRSzKVBspdDzqRjcjVGTg5zpONjeIYhr9kUyEHITv/zgsRfPtvV+AHaeAGfHQ1tKbcmyInHuX0JDu1I1Wq1kVyscodsq964sjAxqWSdnamRcM0ZVuTtvXDpWTs0zIwssKFZHNzMsZaKRle2OTL42oF1fWkVsbGCNO/mbJHzBvV7vIE0aI9lvh5qO15y/rSTda1va+pq+zLVttEiRcX3nDZEhw7SUaoEnjQ8OF4FI2bRHk2HCC/jxJJr0rWPt5F3ncOZxYeqYPEVf1L11iQIcl3EtxwKICAdiSerEFBn2oaYucW5TcYsXtTAZvYilE6U//OCxCcwQ/4ECsJHdWoaYazn9X35tSWJNnZC7DjU8gyjNqPOHIXSzcl9L0AUlAGAmhQ03g0FiaYrYSIDrZ9glNb2RprlJI1YlCYLkpxKCAyxs4oDTVOcwtTJu3IMlimZCcWMqHVtEqri2wVbSkzJE9pmediGtXaiJr+cVSqMNA4ol3JxH8yWnNSNMkSaNlcLW31bIU3SPWM2TATIxHuaGXQvleYOVekKVaQQ18RiKxwtW17IYXMopD0Oz0XjEVZFOwE1ugaErbXd2sifI60vOQn/84LEKjHr9fwDWGABdYJhXHsESo0Yw4rI4hh4PCguqwyTjmXTocjUSSedqiGejQwaLWz9WOZyUtr8batO/NOeyavHjhfO8Olg/Qnh0/C9allBxS8b0Sm+wQ1152Bzc6Zevt/padtvLmXWuiyax1pB7Pv6nha+Lrz1caanq70713vnZnabnTd3smfnO38psNZrturR2bfvT99YmsebjvO7lnYctmWtDCQIWQo9RWgGB7BDh8uERlVLNOxOGWLStNXnyWUlDz9n26MMm51LpZWNvP/zgsQmLxumEAGPYAFFHNsnpEdS6UzASUJslAYJRM0RSszAfGTJwYtXoHhfH87fLB+uahZ1ben6iXJI1C13FI9vleMmK2/zDGqHEzR5d/dnw59PJnMO/Susa/DHrWPNS81a0x7WtXl31d6Zt0PcsVmERgiP3X8fWUgrHWcPoD78q7fcpabWm9frP/ubs2zdnb+5dyat/f6R0DS4+m66+KGfe7zVhI0jAAH3gaOI40x5RCUwYcj/P0q0sP7Ny5/WzKGa9IiocmLjRZLZgShzI6MA//OCxC0ve94YCYxgAUBgfXZoSiqflEsEui9g2UL4uOVvYxolhIHYFQWGIe25Y7QtnFVHwcuxapsuQU4SgSAwNgrEgTm2HlnU7ds5K+1qxWy2TD31SvKuf/Oif56jd4JdO4/28V5yfrvWe9Lefz5mduyuLBgSy4ZGKtUif2l45mfi6//Tpmnz8zM9Mz3TO7aa7PbnVjpe9G6+6UHqDUoVwVQH5GKY7YsCzIsnY+kXTWzrKrfRlW2LaukdIJqEArvEbMiImaleMzXRW0RNdCrJAZX/84LEMyhDLgABz0gB0sXKLxXJGZw1KsXvMUe0IuWLe0rJTCXTEJCYSFQqdom1eLKcprbKtxXN+QhOe5V7Xn/55vyMbX/2pLefVrxyUFiaLSJFjrv+d/f2WZZt3X8alv9+8nlp+w6x4iPaT5/UbikQk8nkTJGijErDUxBqbkM0AyRjCFakdtO16f20CN2NuD6nqsanlNoVWESsJu3ZKqH0JYnZpIeQlhGJQWI0ApGhtyJez5WzJEXYFRUw00VURb/jSqyZCWRmVlUYzKIFAxgKVP/zgsRWJIOGEBJiRt0cLIsU6dWUT5m2ZmraHZl529Lyh2OsLzpGurMuaH+xl5GZlPMudJjLzlk7mR0oUwRLGXvysNsEm6Nal/MI9wNAXwNVVIauxvCwEOGo8OdTpxZPlavGZ3SvhqxtjxqaYIcdgvGexGeJEfQppKaj0n1ExFamhjdowSYxyCLnvly5dGOrnm4exUwQcvG5N4KViKslFPUeXE+HT/vK2OvSr+X/SBc2CXuEyEuvzRFOHKPqzs6f582RYoWiRxfEF6cZg2Fyjnt0//OCxIgpE/34AnmHdZ0/lZZHU3EVdFO3FtIeoC929EydHRXcNxAsfMEqQBhAkbAUS4s1YhBEyqw01nJUWkN1rRKL9oJnoXlX+4rfqLEYLRBtnlpgqHWNgwJy1QCHXgY1yYMvtV6SqqhhS1QxqXGYG3qsbBIxgJGg62CjX4f/6o0/ox/q2a9SAIJs0DgBGupw1sz1XmyxqjBW86jgjbUQKX9hIE6hQEgxMQYVqihRIUQOJCkzEBQylrCqCDcqTEFNRapAWUHIRTDV0zopPJtEyQr/84LEpySj/gEMSYZ9rFJKgPAMbM2QwFU7OSNRxkn3XROWi2yUSNCSiTgukRpVfGs7o5VORjJw7ZZ2z//Xms7UWjXOanlq/mpxvVoisr1ZE5ZG5/rZb//X8tXb+StzatE582TmSNUlJ1ozlS1ts7P///fG3zlb97zV5X3Dnn+mSLRre8ui2z3yjrRJXmy0nTBstyVxsWoCZRi60MyYGoFjEXh5iwQADDZ2n8G0pzNhzOBpvDCki9PCj7anNVHwy+VZHzserzBylfkiONOEKN3+Xv/zgsTTJdPVwLVJMAGZtU/DcRYMposzKHTN4+t7hiHL0OXY9OYmZDicJTp3lAmij0YTF+evpN9pJBle+z941GkTE5+NkGo3YLDMILM1EY1kaMe5/9jPud3LCvT3aSxgIS6ZpFJnUBiRgMeiMzqTwKNDJAaMzBDv/z+/38+/vLn832v3mtfgYfB5gAAGNAwIxCYnBIkRiIWmIQaZPDZggWGJgEYeA5h0Gf//////h///4Ya53/z13HDP99MlCYz8JDD4lXUYeCwUB5iMDhgPbCXz//OCxP9RnBXoA5zgAC+AqBwcF00gsCTEYJ///X//////////7z3hjvDmff/8Oa/8sPBRjLsmHQWY7A4GACY4OEa7ImiO1iBHnVXLpuUx1XaZ7RUB9QIQQAgiYCC4IeTASQ1FackKhRppWbwhGU0QsPGYHCN5hZ2YMZCENLOtsmIapB1xndgnstkRgPXGY6bFA9WQHo3O9AUzDlRD0t4qI1UqsHPXymmp6iMhchYMFQxTTUSlGbSViyqL1L34jyoGaCgIETKhgXJX241C/vIrKaf/84LEfEiDtkBTm8gAfGCtc7jKlqrSLnFQFVCmZcz1fOMu1amZLGX9mqS3Lu501Jn60Fh3nZq1NhzdWAShj7FFAVpUdJFbMpt6v0FNFt0FW1b5rdLhy1rlxI9jKYix1/LNamzZ3WTxJvW3Zs1l/puZxldStdpcqWz8zrXd38+46/Pf6rfrmKmTCWqMadNrEw77+TFuxEJbTPnJZdDUVrXasZqRqXbu0uqbuuWqvJkKiivZmGQOnDHI1G424ZE2glTKJypu15bRhOg2tYrKW5We2//zgsQeMuP+Ub+YeAG5zWsFKoFHoD/ISMA+04rllPngxu168Eb6gQ9mkkQm09nqPUDPH66gq9yhNUHVUq9lewns6mhzwd3j3tXDyC3RFRK4q3edbg29PV6oPHZJYdNRVbNEixdVx9vc6jSTxLW8PNP4k0d4/d3hxd2r+9o9q3PfjGfr7+dV9c03Hj3197+/vf8vfVt61hf3rjeaW///////////vvN/77/9Men9P60ke0tFxjVq/MGLHVUAEta+tuKQmFxRFARrP6RQoYBnq9WT//OCxBYxO2pZn5h4AIKGStYEyVPhSRdBENxXbeUIIAPwAYZSlRbueYAVD5EcV5+HUmdPQviWmOfbLCYXr3P49CTMTCHxVEru/pWBm7GiDfOVqgtba4vp4+4V9S4tuqsOdfPw/1K3SwaZrr/OP8fdNW1jGf9x3kPMR/eJ9eTOcWrbOdV/xbNK/ePVnzMzxosZXMrnPNvNq1raXWfqFLmldV1j///////wYUsGSHmkPMSPaLZ9BkfQT25aV9YIDJFSVT9xeqwrhFui0y3zKFwWItz/84LEFSGSJiQ32FgA1DUrV0WJK6ynbaM2cNyaeWyVMeg2eiazJNOmr2PVOG8IPpWmS9Svc6N7Y3NdbaceuXTFvZzfupFaruY7dte2uIjbbqdLoiOa6bX3WlfzB8sP3rg8ImFSyhtXoNehrU3WZYnCkV12FoyeFCSowDEhYNNqEtTNHSi2Y2xuE8OIZIAmHwLgCaVAQlQHoqywoQZKuaYMOxuLsPhGDmlJDkQAU32t89EkMw1IPgV65Gov2ltViCxY6TD6YTQ3NHocVYqq3YfFm//zgsRSJSveFDVPQABHS1uvNwf8qsytR1yu8ceyXbX71MbdS0VdppdXUM/T+/He8zPHE7v/zvN3ES/36czDf8QvzPxFXu83+827Vu4+6bytEABA6kEgCnCw5YgElxZg0jjOvIoUlRsAQjtMTkViERjzILPeSkSwH0EaE9hATZsh1JKOhhzIxjXRb0FO2PKI9dSsgK4cIr7LGZ49o8F4sO9oSniSSUxDqrD/jPFHBesFFVDJQzw2NGKhD1cno75jw3OeF0fiGGmZCqRpY0+fykWC//OCxIFHJBX8zZl4AK7KjZxmpMpGC0a/VLJp3SpPFaZEJVn6fChJqV4mg9huqqAyOT1D1ZAbm2NCcpHsZsTkR4+0+VckVghVL2P8vi7SqImQky3G7Ap1am0MN1reKNUyquI7iqxuiL0utYite+4XhK6M7XXY3OGwQ3qMP4ySXqMfCfJySc0CPHA9HQN8fAGIag/02PQHHCeLuLNCriZhYEQkq1TXT8OBtSePCSktQlwdUQCeQ5riNrGoGtnNEjJznCFQ3vlBQB4ju5Q4gaaIwdj/84DEKCib5gwBz0AAK7CMFQwPBjFh2YYw0ezyc2iFOSOOXGqOQHywfILD01RwuNAsIxcQCZEBxsuI4kEUYTQ1RcXHsg6ENFYaHsgscOrvlK6v7vn/qZ7jf3mn5e+7XuP7Xe5jjn+vi7uLGZnN6QiGa3wifo9fCL8y6y8+yzlvcbLMY97muFlKCTJNqJmVV5esmLDYolHUZiaDPUqPYKo5jZkIaGJaujaKHph9SZvDLa5ASIlHTnBmcERBFcjyKx6kt5GfmwiBgMCJNtQlka6B//OCxEgoC8YYCHpG/aRJCAxEiUTNzNoIidYQFWmnmU34KjDci6lWqw0lzQtTc/zzTZCPc6+ilTf8ohc+n58d7gfqr9xWZPuTtgkwr9OphC0LvE751rk4tg4kUVPHpBhEAIHNOV5VBtSalZSlavzK/pzUX9gUMoItELUlA+TxV0nf82vvh1kb4kL4lUl3ioMRcnxcVHDo1X2oxasbLuV+7bVWKOz6EmdrdtdpSSqG6omEX6W7n9c255eA6c6Zs3aZnKOk+nWfrilewsv8W1y/Px7/84LEayrzzkW+Sw1VpZIZfJGuEJlFngUoEC9y511g5yFw7OYSCC75RZSkL2DL2fbf9u/x6qN2JuKQeysbLbXMxgs+dPKmlwuFe/+kFKEKwBHMemLD/T6/DFcuOTAkGnLYThWkJsZmTlVZ9lMgWpjUnrE3pHeNl2ytiKTO7a5hxOf5kU7kFK167UR+b7xgwZXH8dDSAhL1alQwI4uVJ0hAufAQDRZCV5d+YvIIKtYWaLE7bnJeRTRd0rmkL3Y9zLNM9FNBh1MXnQMxIcC9EENCB//zgsSDKXvOKMRiB8XDtKwnZM9zqmZoYywAQPXBD7h6ICAg4xgBAzfEyB7rfmVOTiyAnl0URTFvXNV12ywRRNtTDpREpOTFOirOBLtz8ULUlMeGpo/aQV7B3GhCog2dnNXjra4pQ7hQ0KSFIsTEL0RpYsWZooKgucOvmjKDJlDqNI8Vk1uwmr1ld3zW3y0wmo1J9u2tVyvLFoOuSHU51GRRlZEtD/byFTw41Cn6oqvHcZQ3Bm6a1F4Zfjl/UvtyjOOPLbGUoT5WJ58l6aYRUcsy//OCxKEq69YkAUlIAbKt7Nm35gUfhvC9MkJkOhVlRpa6MkBz34EYlkt41Krr1kr7alUic14ulUejHqlU9gazzc+RFMtK1BcM1W0fjWoCEjUGqxQqxUjgH8c17e6fnZ6NhEDkWCcX1CROODwgmaBrZYcMdSHumCmXKsHfsHcLMq2XnkM8XHN7Ioeqh3o4w3bm7/e9+w9fbdXr5uqutsjgsquzU53GYo1CyPLXYnc7Z5fe3v3r3wNN016LFayJhQanjJ4mj9mCsbWzmPWSG6UrJHb/84LEuTHsDiABiWABGmTLmT3df63+dhtmxrEaICCwNA1tAgBApWK7lTe5HhdBxstujskgDiAaaW9fpAKohFFeJpt2lRsIoKXrnEMVHMcMlh2Jz48FONOyJUcfXe3ZahfyKteZ+5WrWs1qU4KA3FNdkMVkqmK+Pxy191/5+Nxu/D7WakBS2tDVBlnl/f+RxRdcogStLLN9+qOJRabjU3SZ5Y5fjzHnY5IHYlluMXr8OTM/KX/nqG/Kfzxwxq1JTc/HfMebz5nn+dt+57kXlVJamP/zgsS1P1uuXl+ZwAG5hSdjE7uT2rWsqavNZ41rti1S4V6+ePcLNzmrHO475hhjDkrn85ffl/dU9JSTmP85+fKszRU13Cmps9Vr9LjcD+2MWvqurNL1IBbE9E4OOmFOqamGPmkkp0mngGDLCRwMQiEAiqAgTNVKU5dtvEGRg7CPD2KZM0c7GlWVAzM5vjCZlrrJV6uW2SBJ+HlSWl9wy7PJbxsb21nbb2Wt3aYyeBIalL6X6Ple/SuxdXQzt4151XmfxTqGy+uFPWsTVLnT9Ym7//OCxHtIjBYcA5rAAI9vV/sHqv2uBDgrAqokgk9ALH5RO6rTOsr/ZuNZvrKo3NZ391IxjfmpRZlNHBkjfV36sYmKWOwPAL2xWBalLZu15rKVSq5Taw3nnQRGpD/b9S5VsQ3y5O22PwRZktM+1qJ3b16cl9mKxDHHWFBT01ult8ws/WyuZ3LVWrXt1NcuySWQFEa77xyxEJXORvCnksbrw/hEHuibd4IgiNSRfMfcR0pW88ttKqEKLFfPhHfbhoxOGJENZOhnISXa48HjA3LcQ7D/84LEHDLEBk2Vj3gBxF5hUZ0qA6wfhPxj137fIEuTw8IVo7bBSKumLArYU7lqQ4qP3yzOojq0nGNzvX787vG76YHJEbhafT1iOob6JqFl5RXH6oIje2QYOXkHTaxP8WpF9INZ4G6Tf/VaZr/B8tvuJ9e2rZ3mF4VJoMSl8a/+sSQb1q9jQs01/7yx5Xt7zWgRs1374rPvNteuMV3WtvjceNS//lr/nFc21/qsbz319wLS2vXOc39dvcTYCwELPFfwayMrGAebxbSn8EaILwECDP/zgsQVMQNSTMuZmAEBpjJgxoBEo3ujD8HALJAt0BVQhYPSHGbmJsBroKXBAEsmBWMTBwyUNpFxE0dOjkmSb1j0SpMjyRxeSWitBaaDHyTMyYKqJeTMWSLxeMTRzRIzSSMS0YyLIGR02YumRkRZ1oInjc6pjSp0zQorSSSrpIKRRUkktFGkktF6utCt3ZkzdNBkE7qSXsYmTpVo/r01qtt6nZNmZ1OyKkDlM7MABz8uuCv8Fhe67rviv2QnG/GFllQFOwdwnFl0qTDZoIyF2HJe//OCxBUsiiow05h4AUEDWgvEv1X6fILcORrEhNSOxpxiYKSxYEGDXBpMTkwszayyz/eXTeuY0ZU2Ury0jO2tWlCl2BuV7KipHKrNBgt7186cY0CElTLLeah/rs/llYe0UMKMxba9w+qmiPBgQYu9UvbGcWz74rTT3Fc09N7k25btBYJexzQ7rmnju/z7LpnDNuqxGYls7+tVQ/8scYOVvzKqejhAww+3463VEAQfVFaqGLIYNJNmEzRDIRUFUtYOygvWqg5CuY4CLKMDBNLpqQD/84LEJjEj5hSpmWABImvWllYj/VsrasFUj1Uuqd9Y6tVtNnhMEs4tVhehtrWnp7gPAVLQMgxEcefjW1retObUs7Vv2HR1D8kFYkoKCuLxWg3XlMVHLz+zuX7pUK706+cz6xiFi/2r9KXZz/+b/XfrP0pOzlIIZtz96fTKuvZXK6/0321bWtfsnv2u2nY/2ftW3T7DMCNavZgdW/0/SBv7ZNHq2/Ms9yucKJI1UgAEMMsKooxLVIAvn2deQMRd04rj0jnsyqT6nMzVhoZn1itGTv/zgsQlKaPiIPWPWAEbub7qBCGIYDzFxjoeufIIXjuDyQC3FN+XQaj0SyUPJYO1kXpHVGe9u4iAlgTAQgkLDuHeXQ2qvu5tsPPvb0SYmrdaM1EHt8Obdx8VZ9nDYc+o7mdvTnw34t01x1T9n8TdP62X7Iqb+YR7d01j3TzxXXx7f3/H3P9zP9XdoYnR+DpFMYWuqrCiAmkKGGiZYbQinfsW5CtEzWjyzcxEayqpBQRFw8IBQcI6HlZlAUXOokHzhp3MJEMJipCsIiwdM6jB7OJP//OCxEIi464k9ckoAWZXOSgsByCwkiDGlaUrEFXMgk5IkSQhF1Pbc6tomc5J5yvUiXebon1mRy3MybWo3v92uXVZ32TsRGPUtHdUNIMQ11W26v7vxi+1Y9LW5FB5RfpJVDCIdBCMlsLK08JqAbRmgKnunqafXQRsrRJPoBFBEdTFkwHaE1PfNIoqOZEiCyjWui+HEj8KftGlHcyr19nYuoBh3OPGlnDm0+TSKmoq6NeZbcmu/Z3oifiKM4LIqQtjqxtpktzcbtt7/2rcK8vHz47/84LEeihzpgAAwwxdm3rMbGo2Tsf+uu/n1pnJOt7Nj5v+M26XTvb90PFBJDEsauKhZ9GsOT6FCMymm6Lfn6kbmrPI09jSzjCpALJAWBstEyXxlZ3snMpMguG1yZjEa6iBhmnpwgD6+kDCBCaGE+6SBqYI5w0P67WlyacSzJ0Enx4jNdlbhPKy60r1BAtrTj+22Xd48lNd5rvZb1j5nZ8ar7azGk2lWbES3TpzL8R3Jr9r7/IQbCkToPg2H9FVr9DJa6h3bciHT3p3b7GSWTiV/P/zgsScKFv6BArCTF1oj9QlaKoiAE8YgNsghvFM8LcnIThO4sbY5q53i7jGVj5XxIp/Q5bzT4jSsENEK4H0FA1kzACuCTOs5KmUR50BFkyoelH4TVoWIcmQHoSF1utmOu0NTeYUQTajbvk5oINeEPuXqHjMaAicjsqtDN4wtLYcVDIBj4oL4plEDw3pjdEzIUDIEz8yIqQXuUsMQwqdhktBo6d1jsVjuHWY4oWyHkXDdiF1aEwWBUraeL4rI104iTaPM6GNsXdnq05IQdasfN8B//OCxL4oRAYACnmHMPPYHSiNmqmOBlaPcGiFZNq5kjUIpF1YM1fQoldvtIUD2cQqIlUBMhpKBMQh42S2cIzRCU3JoG3IUrzuauGJw3JXnqm2SI6w+DpxRKwln1lEr/9SdIhycY+2sqsktuIVlail88v/Xz5/d5O4whv++dbKNVsctntc6GJkQpYZm989LT9wdF7BLtO6uowFQpGYZEIiGYhAAi3yq+BIIpJ/q4UQLTg4P+7SVgOsX1/4FAl6GAMobA+/+sHoMQT0SYHH/+Xg51X/84LE4CkjSgwLT0gBmuQEpCHA2v/+ZCvQ9THAJGJIXkcRff//+XhjxJFfvxXTcLmnjtRGv////GZFY9Z1HCZFYikXGTqIwrl+D//////9Xhx6STR293EbHHLyDCfq5cpxQp5vTxu////////3h2iPIMdngRGSHHj00pGU/jvcicmEkjyP1EoxVJ5+4//////////9Yf73TU1/9Xv9Uzvf5+pxnbrxWGBHfQZEU4MNIISjabTkkUicUcbWUcSXGERVEMwOC5i/Eca80oHTUhtcqP/zgsT/N0Pyel+YeAF610PYYJNFehifH+hirHpP1MDcsuIDExF1VoYu0ONI3coctRYLYSIkTfpMFzOtOohhSpM3iihNhutKvK3KUScOaAzF2XM8aFGXLmolypYmpYjtvY1K3JuPHhKGXMTbInm5kgx3sFdK9S3dHtKqXjA/1PuDBhWewJNw3GDCke1amGA5RnlLq678uLC+iNUdzcWttzPCWHT5lYUMtGj7tOnWztk0OSDJi8tXmcW+r1P45nTO7UztZrDljTTx6Xs+hYb4G4W9//OCxOY9U95ZH5h4ANvj6xmtd5/+a538whXwqqpIDGFXq+u69qV8hExRJ8DoCiJycxBxRFuLCIqMYlrOEPE9QwZRvqZ6VrXBcfAw5N2bPltuLwwOamRbm24hViIehifkc0PR0JIs6lUiIboLLJdnaGKZp/qpm6eWLSI9xBY13rSr1qjB2OA+b9x4m9V19+281ltPLNP4moNIUe73/+FhqpFta9o1cU3pqj6YJ54FLX9aZ1S9NSX+7ZltT0tq1/esusxo1qb9s/5fZhwbzYrGgiT/84LEtC8LQkWVj3gANaU0e3lgltXVAAkAiGEEEEAAKBACWMBBFA5e40QczQA1Dk+H82owDHjBnTLhSAOXRMeURKOAgMoQMkAME1MQcMGfQOXWuw1JcxokaDg1IYkEFjXvuqY0RYFFF+wGZJKYgGYYPuD4eisJk9UxAgxAIug8ZdVczW1gZyX34zaTiS8exN8wIFK9nEqkaXtxkQFCJ616aI2opW0ziUKaQBDj3soaYj+XhAANYZQZdVaZTldLu69Le7lc479+vhVlNHUmGGO4gP/zgsS7S1PCLXOa0AB0e3acqZlrDX2dp3qs9Ee0vP3+OHM8Mu/WZemAsRtFN2duOuhyIpA9/9yu/AUtrbpYZkOUNS6rGYzqVP93e/tY587+v1/csNUkbl9uMSyxbv+/7lw+5EUvYfh8zGdUz7VbNneP5Vn2iLkuzKo1TNZHt3rVIiblt47BapRdkiVK9U3AIRxkfldvyWqXG0leLBomw6HXadNzIlDpNII6mJ6ufjEsPm2Tdu0EPRdMLKmmnK5q7sHtIUwPWahy1rdm4ZPzXbVy//OCxFEikW4gDdhgAD6a16BpUyIlFQdAI0FBLyTkLgqeStoiS1XUtY0FgJQoXKhULjSyaAmBamJ2WW6l/e5R0cLEmrmlxdUSmGM2X2xV3WUtLRkGjKbuW3lNBD/P2sMWArQkVC1jUVljYIaDY+KYx5sFxsmbTRILCmadFc32/AuRoFS58QCQkindN27qOuaba69tLzdWbBhB12YK1zC69XHpn15TzZZPtzrOxQ6ji4dMEEgAhTBm7mVpkpISIhqSQtvM3iOpkWZkZX/+nO/kdzv/84LEiig7bhQKwkb9m5uWmZxwTEHF48XhymyRSzub/tL3/fZIa+W/5+TBHqJRNyl2sH88njRodlTg5NuRUUpkJMmf1tdnIkBKjeRIhoiGSltEIqUghHZDvQkBrFSHIQi0i3fKqvlV4cOQ4pL+pLCnHg8Xt9gSXgk4qYHBSMNHijIpHtrcxpGDRDa42LS9fvZxSSvpmak3f+pMQU1FMy4xMDCqqqqqqqqqqjVtb+NpIk1TIWITI4oWhgtr9TNTVGXKVenK1HkaSqLqf6MVimgnUv/zgsStHUHSNPR6RpwOrCfrqh0ppD3sBDVCgSsoTiCSMSLQD8kUgm9YZMsNGBFcjLKi9sF0thq+PvHxlfVwkqsh/GEotbiZNqU2aZerv7JUzZYs5SdLHmaZG+CpiWtK2Y1OVsEW9G4aVA0AoIAzHPxYU38quNVHEDm1D0aZQiT/JdjUkpz5cjWTMhvtBrAZ6G0s5zXpKkxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqkZe6qwoJ2Cuo58/VzU3xUdB23OUSG4MiFIU0E4nOPPp9WL6//OCxOsr074c9npHOVn1hkaFsri27qHGhmSyNdtlzx0l4xLpw2F48Li4flkmEs5dZpeC14La19p1h9qBf7altcd21FGfzICKBnQBeUtRiQWGLIydQGYvGDBjiilYWzXNSftIypgrC2W8UCbB+oJyM7sTm5LCWwjhvJM0a5W3p3prSNDMzFUwbGqsDQEyDwEKJKeRHBMCTEFNRTMuMTAwqqqqqqqqqqqqqqqqqqqqqqpGb/jbRfBqA5QwYNlxUtWPuzj8W0e6fZp+vM9P/PyanCT/84LE5yr0ChRUewbdhqB3GUtdLUK1yjCRCkpF0UmCrKiuEVC7K246r10pW/xjsFYIdTSfTWOUuMbtNjUbq2O111DaFAiatlJcUkSMhIUA8FSAeyAoq0SXQJHyjEOrzTTU5VWyd4yRqCRGCLbjecskWhRv02EW35X1ZXVrfXfIVszroIlVJSUxtblNLbLxU4dcICaIi9VMR9ay8qCEa4ZFqha64kH0wGC8jjzEwseJG0yAVSxDAqfSNa5XyKn6SETLRq8SGgTxE+EiVmLUyiI4wf/zgsTlKkvmGFZiTR0KRNneVeXbxAwH3qOJNRzTFbqUniDUjVtwimwxJYUJKN0YdHIp3ScijEIxQpKOrUp6rF+/FoWlBVRI0fOKPvzXuUpt5Pxb1Y9iOKuoMR1U6jgyUVNTSTJFLUxtmUIr0lX5h9wbRUTn7Nwkk0cYKds/azycT28lnJcmRNPQp6thOs23J0Y4QtkyykxBTUUzLjEwMKqqqqqqqjCpaarh5EQCtAHpl7i49PzjKHPo9RvdEzRZjqHF2H9GWWiigv1lkVdC00O+//OCxP4wnBX8LMMSJFcbeiksy0jV1qKi0U4RW6v6ycpQNp9acIblw51pAqrCPps7CBlWJE5BaFSaJJE3UmU037w+0tOWThlaze5Ak3spMVsbI4ymZpAv1Nm+8Sp8nwVQ1NyB82v22WmJM+CiPp5UnOQYrI9Nfqzm+CHWCKlKlsmaWQoWITUlJpb21ZmaKe7FjWY5UrRVBAgAjroAH9QtTWEQmeYg4LYzkozqoZyRyCaVVMuDj89LJTQRkBBpHAZCtTUuu9QGLkS4n7eUYv16vUT/84LE8C08FgT1TEgA4GBm6KZJtJK8+3caekxqhUg4BjqMQRrPtVrvberGVFfw/OWhD7KJ9jr9KaKwcqcp88ZRjU3Kc8aLPLXJXQW4i/bjyCNuv9fDHC585f1+NikqVs7VeplevX6uFJRvbRwIxSmdxvmWo/rHfbufK1i1jnVvWaX8Pz5nhu/hUmsOZY7qXrLiJAQMtR0mAhgZdNny1BIh34o1d3VL+Vc+3Lesc6+O6bHmV/WP54a7r5r7PP5e5S1dZ6//SvbI6ivI379zmpNT1P/zgsT/QZwWAMOayADdm9cq25/7alAFAINFEYEmAMFncpQYVVCQjNPJWemOEsoh40hKOZJTGi9TgHFUwaZLHgPimBg4EX1UyOJITRGoabDAgMHAI6CQ7IXZPSggccmJhbLpqFwXPwyZYDm5xpl4QPfS0mhLCuDqlzyNuajATc2ghNdLzDhiUOU+1ulkuFPIbZgYwLEIKEzBwd9iy48aU3xuX5U0xfnqsjqyKnMBAVnwWwdQASD3QVwFgKmu9zq3b2E1uYt3sO7yuK5Q3jawjxt1//OCxLxQI8ZbH5vYAUnEaAUKGAiqNQkVl2K2X8y3jWrT0piMpy/eua3+t6x6sOjOpUxRGAwMFUcFhoICC2aE1OpHB3GdqAWcsaaVW4jS4ZYymx9W7eyrd/W9//P13uIYFBgQiuj6v5OhlD6tPYfBUgwmJyWz7+QFCYvdrU2WNzLK7urz9813/y3fJC5aIpe6v6pla6qmqqu/6pR+DWKROAUTGhQkYkLwDzIZSBQlYQMy3JYQKgPWwwCQCMCPA5boMsJyBenao0yDCjGahrJlSsL/84LEPztTojmVmXgAcKEpo+y6nK/WyXvHbKW1WN6mO6h+rqOpCbTn4jKLl9drUu4r92kIUVXx1EkFewGfEcnqJb3UOsdRxFSkF2ij9gJRNyq5kQxdPmRKMZ0tMFbfRVChz6eI5v00wvLrtwZmVbZrs0BRuD3flmiakbpXFTWZIMZFME0SSFiWLjTCuKu5Y0KHNBvetsW94kKPXVY0Td/ePXF61i51Su7f/eK/Ovvef9Wzmlox0j1qcs8HquANvp85hVOgaPG1MFMI2nWgPHJFzP/zgsQVL9vSSMuYeAHcghcNJ1L6b7uAYb+4UIij0hVjq9D35fa5iwYtS4QIcAlKy4xrQHKS+d3b48deZVSxYzS2M1pqyvfx6Wq3YfLpO7ze00Ct85urHjxnj52oWXHhwlc+nvEvT4rveN6390pR/HjvImtaizRpLY3Agq17aNr6zq+N/Gv8/0vfcCmr33u93kSm61/9bWhVi11vP///+8/X1///733/6U1e+6Y9Pr/4tGyC5BcLElVo6+U9AM9AEgEQyMajDACJHRAZyApy06xZ//OCxBksAmoUAdh4ASlqrQkS8DX3HW0kMy6Bmkp5ChjQiVNMU3gzlSaJumirXNco1xbXGVtl7M3UZXr2t4TMxUb2q08+4Ea1YtN3gwn0aLJemHzk+tS2ffU162ta0KeDBYZL3zrUmdwWWuILjjN92zbWpcQs2tbFc/F8W/+4UbL+3AZMa3b0rKUdY7RTgUuz5TX3fLn+7qduG6dcvrQVTc35r/pBJBQGOI3CJI6sKAnDKtYUOOIlKVwE/KeogMZhNdDpDjENy5batxe1pLqNfTv/84LELTOj4fwAwk1pm59iT5qHSmUsnZYy1JNpDR4bgVulM6UVcuDGmtfhxtoEq0R8CyY6FS1iMoBTRKeKqEMawnhi9iOE5k2rMohSF1FHym42REkCSyKNJoCSTPxImdpm0rAo1HSq/RtDToLRmKoGHG4oqsJU6LscFSKqDcJRp5WKkyrf4+f3l9UHEteX3tyVSjLaGqrn8rMM3ubFKYktkTYp2Mfm4hnZiaf5QGq1Xwg2yZPcORGBUCOTfPS4rW4aiUaduA4aXlDT+MGYuvB0nv/zgsQiMHwB/AFYYADZcWUoxZM6oZQhCRpaPghuIpyy0SwLUTmDIlvCMaaEzRHicQC+wiM2jnnE1iOWFrdG5V5ud6rbORRPnzPpHzF9ItXMVjdg29mo8ra/VX8++18VMrN7ZfvpVdkf+y+4zWk2gYZ/Y4Gr42srfG/l7vWL6dnxdmTlpvk335zL49s211d3feFmkOzR/tv8t92Wg2cpW9d+9Wt6f23T1vn52CdeAPzdgBvgECHNZlRHqgmWJ23Uq+mUOkZ1wSCmbnSmOuJUpXbh//OCxCQv8+4QAY9gAWF5XPSw28XxDbEtIyYlsdCSPReVrA/MAHvFhYZoRSZfVmJ0d1UfwfpB0eMET0UvLV8axtPT4YDONa8fOsKC6boCcnuWh69J2ZpM+2siyez65tambzpm/SegYlyHafS25kXfu33oGvPInm+6f/OtY/PDs3UmZ/q/37RP07bzP17e7Z2ZnZp070wb8z/zk9PVm0/Sn9Xdbju+fgkVohcgbogpkA3WdBVtOdq33ze8XLKpPJvW6ZaZuXCVYdxzb2F60upgQKD/84LEKDHL9gwBj2ABkSklgehFKtzlE6I4nhW0IzykQQATEu0hWLnx/HBEIhdN27Eocssc1btRdAmtdpiISCgdisP1g7yVoozE+XVKq5vLdj1ss9NmHREUxubur9acWwNPPWat7M0azPdaOmeq62trNZYoyvM4zBXDc8v89Vdl3XTkux0jYtM52NQb8/V3uvXd3s+ecl+rDtW32/p924tm+UtH/5Mzu1Z8onqIVRIAYxPA1RPTkJqoGd0wR7nIsxG5lbEIq1N7bEsyQfdR2sna1v/zgsQkMzv+EAuPeAGnem1AhzVua08u4qaLmiVEdDM22zPmuojwsAw2IXwmA9ZCW6OwsMBmao995zbS1DJyI2JoPUUo/zv09uywbyTw5H29eX1kTyoiP7TwJokOPfFbfefjFPnwffVs0v759cvHzo6zlTZcFMnVGr2DM0aJ541/LJid7WbevbNt7+fn7zXXxmI/gOUSHX/794TySsfcLO96z/8/19/i1q13rF/j7ze38+NxRhNKOkogh+AkVr16a3rWmWJqtdQ0N9Cdu+5sVKJH//OCxBsmk7YMDcwwAFLK6YGshJPUJcecCamUgTo8CQByZASPpZAZew6ZWkDSfGFhRjghSXbWpCTxCIDYhIQas5GyhhPLSMlNkLl/8tBl/fsv82Id0PfjPrP2ztN/H2HlrrLXDw6DazZs233O75zJdo/nsX87f38nfUR9h53xH8Y+PGoWUHDQeGwJRLqqGAmW/sU5YjAXn+D8pdVwHl/pdHcWV5wVyWXJBSBSUbtStdOeXHZR6KoqqraQwUbTbEpx6sk9zzyHi0gUcIZdBMYIUYD/84LERCUz4gxUekadihQYckMyMeGSTmfF2vJTp+b1ECDEiRMjcQECJk4umRV2N1CEtBkOGqKMZDwm3wTmJLcnbBE0wUWYygs4gNxakGZZyGUPt0d197jI4mkHGa/KWC9G6LiyTnwS4zRbi5O0ZKIRKwiMmUXiKhpETRjA0tKXi0qVaJdLyUMTKlB0nPUqSBMHDVwhww1PHkmEJ1Z0pRrrlSW7mm5iikRRqRCsInKXZJRJBF5XNq0tFOC8xC916Sr/KxvD6VSRask8z5pWEzS0O//zgsRzKYPN+AB6TH0mxAHSgpotXu9RaH+3nfd+xmx95kX/79w2U23FNPIFsWYeUdmFmSdLNLPWbhYvlzbO9HwIgREfZ6rNNSxZqOKxWRUKn01GkTSuStmt8d6qFJEmzIsTJmSI11hUkuzIqS+PWnGpoYTFL4yupeMUT/630ihLaRbSwWFLNWKQyyhdUpStXJWRb9ljkn3PJHP3recS1jqmccijMzRIk5GWJLoGCnzWBgFFaaE5Odjkqqjku8/tTy0Ol9AS2YMKuzVQQF7GtEtS//OCxJEohBXcwkmH6DwwEqqAgKgI2zXOquql+FASmHUMO5GS96zgARIAveBmNdQll30Ab3K2JEQh/JZdp8+4YxsFg4OwXh/aJpUv1Li4onkGCGADCMaeQHhnIuf5ANA8TsUBefBBlS9/v8vYuf1/o9/+7y8fL6Hvbu+99wQKGU96VyWe71wibv8JXve7+4uLv6J/8olS8ClQ729/o7/olcJW7/pX737u/CJ//CIlO7/CVoie4ufdkEglkzddruMrlcqdTqnI+BDg3BugJY0v6aX/84LEsyYsFbgFWEAADBnYoX+depOHGAhzLyYMFBwOqCD2WGUF55Wocvqs9apLW0p8DRFExUCMPE4xA8CskeN16QmEwxMEic00QltE9cpetk8sgN1zmBs587OVCjghc6NLwlPKa7SUMX+7b0EPQk4hiWZyCETgZeGkxs7tyvKdR27dl9vdu/jTz4QGl8jEQgDEokTg4CHAMgABGDWbfJVdsU0qq8p5/lu/jbn8aeR3iqElQAC4MKAKhxbJDqKAAhBCwCiAEBoEKgut/ur391ssdf/zgsTeTyvCfl+b2AOedvmdvmff/n4c/AwAOEYcOh44DAkKGAdQYSBlQlr2eiAAUXBwCjctXWWWtZbx1rHn//8/n///////////5fFIpAxWFLtYkAMDjUNQJt24tAi6MnIiUZrHZBXXTX80agIDKCQEcDKU1B4y4tVWMJRDmg02cwN0pQd+HFiI4RByGNH4cjGEAZi4AvBAU/yRheMQOTyRnXC0ktEzZhzB2XN2iuc46Swy/mSQNTSR7cpdTO6wNuT5yqGnelUjnJSyeTzTNn+J//OCxGVEdAIkM5vAAQChrA2kMughuUNRRyZTGKGmon4fCzKHcciYjcW1E8JHYxtVZRuxSxm32rDr8Q/K43lWu0cVcKpHI6/MQ1flUujtWkvW/xkU1P1KWvZjn5YUsUoob7T1X7mqSdisO01bs3dpvt3aXtNuZ+W17tN+NSxjhetzkYllJjSctXs/t7+3Mcq8pcb3b9rP7mfOf9zdW9nnr8d5ax7re+d1+X9/eFJjGKufKe//7r1+y+RShJIgMJpUTrcSZUTidKhxeSwYCOzFNJn/84LEFzFDanpfmGADzYUHVw2GYLnzEByPG6F4fEgIwIDmYwFYHFNAhQSYdSOR8Pg7nYSFU3P8MjlaGC0il4qhwLFixQpMkrmQJX0bRVZYQ2jaJ++et3PzoibkHWtBRey1FFemZO1at+y+41etjlIepo0z25M5ZZesHO/l575y3TBPpXnbvrab39ac9lzNpl8adfvk5s2+Znem27OTMrk5yXSamMWscXmC2i5M9CuWxlUh9NSGwtQ/7//8CNqomWpMizsstqpFDiigaTBsQCCItf/zgsQWJGJmKC3YWADHDVsQiZNQwcxt3nMbnBVyMyw+BETXnB3OaIpOc05UoIMtjWOhmo5zTVh72IxZ91XDlmtpZruY6dcUlFMc6drEmO5RbDu5a487d1u9znOa1rWubUyyL52t7bw71SwGCY0FlHUOvQdECDDRwBh9oxJ6ScoUPMI/Te3+4RD6E0y04hakcBVIm+XfDEz5IUpGknXHDW1hhFteEWXKmSrC6EXdV4msHjYAmUExSEwTBtk8xNCztHiMsaatMy5aCnVMpoY+T1YS//OAxEgmOcIIA1lIAZMERLKnSNTREXnmMutDJicdo0pPoUM47lTy+00e46m5FjPf36b2Nsd4vjUS3/BPcGbqY4deA4hxN05cy2C2LqTHTF9iPFGgPeLI6/dhjx835yoaaqwGnMxEK4F2zMzDiDAYORsUeAUB0BogqWFAjMxokFiWgOBbIkwEKIBppbpIBbV/YtEGgOO80tkVZu0pmKmLzwBVilK/NLBD9Vp6zWvTdM607nQyl6r89IZv5irBb3yqxAlPjTQ7KJXfmLWc3lGJRv/zgsRyRlQV+AGZwAClVaVT1Xe71mJQBAT1vfD7pOpEK2GWNPXx5d1vlivVxo635zuU1jnWpXXfyVsvbq8zEJqWyNlbSr9mjvTU/2cu5WLF2OUlnO/qYnbWFrsuxtU12rfSsYQ3rL7EAWIS1u3L6zuRKEQ/NYUmFTCzUxmIIsZTFFfnMJ6zcxs3JvuVntqnoKaZs1JvlJM0s5Ov3WakqR92OrDv23Nt5hdbPHkSsWm7znLsdNUEENDMDHFpVFDCEBwe6sZhupV8/V55oiEmh6id//OCxBwwU/YUCY94AcOUTpKRXJSVe4Wo7iqnr97HXozHtQR39IT7WcQqxW2VxrlsU8DTc8ZH7+M3+FFbdM0FXHjVdwoHiQ76iR9vMRoTy1G5ipPHZNzXkpHxClf6puatZq6tF+t/Pt/CxFzv51vOd9i/f+8ek+twfn/+tdfPx66rXXvn/4rjWK2xSXXzXOIUKd7Zvlg+N3cPOLatnW9Wrv0lt5fitfjd7b+dbxjGZaIcVVV8i1KZjArNqH6JjwyujnlnIRcXEQtLl4k1K754iZj/84LEHiarLiA1zEgBQqS5+jhCWhEyg2YjWTfSjJmESdN+KM0gdsHzucMebQL1cydJlksminOaxiUjGGKiYg2mgbUJWN6FvcRyv1DE9vfH+rvd9wz78qs/z1VQqr2W/3Cr8Pn/9/L9ts7GX9QXzcrEE9na/1i0GO8D3o8Xv4jkRADeLPwT7TttVKIxeeEcRafjP+aMmc5OvFG2ujQH5PWizBddiL1cVkg7A/useLrbXOBg6fuJTCBeUfNT29i09g2jWqKOsQbU/BAxgnxIqtgo7f/zgsRHJsPKOPZJh8iK2bx36e2EQ297v/sxhkdA+oABBDy3+XpiHmJSIEGmzFgiBCGBECZAIjGLN+Em9N45pk8CILPUEkQ+l68yiB3Ou5Oddw5x/Su4RDGr5IDJjgJBW+wh5A+sbfm3xOqJMlq46SIZ7SMShuZri4OhvZp57INrXFx8satPzZhcZWq7dVVCOl1m65a2zkGYzDTFMvtHRiTUJMoNThMOS1QYurkFLQ6KqKWOsuerZnvnumZmQBARKvDDh1okaLzKfDPk3udKQiLK//OCxHAnc6osIGDN5nu+2RCiSTVUc0kFJbLviLMdXx/T/X2q/7zOZtLZZZF/Wvk5hEjzihcLgqk99aYgWl25+UG1ZUpOucHkI+lUFmeie5GvBBqrNsz246gjJ6ahe9alJESwpkqiQGoLwYahvYbQTZiIdKI1xSkQNCoQ40HZ2qoFgmu1B7SxKOxTTXjcJf+XmKddwZ9w0CZC2MGsGMuM80hYP62YsbLyf2Nwh2UBCYUvEgT4/kwX+3LhvGOJLCBU8SZmDGFxqICjhRpAWcCGMgf/84LElifb5iwiSM3vh7st04v2ClDC1TMVZk6u3j8nKDap5fEU02gSeuQay+Dsg9uSS+LWWTaM+BtXtwStOjGJIU1ZOlJEmpDbhAqo8v2VyN5AaMEBOwSJCGSpo2efMqSxMWX1eT2oySyUVHRhOdbmpWyxdeOVV1kvkJR7UdhWbVWW20rZnULy25S86alB1qqVWs7fqeSlBeOeO7ewl/D7cv6nlSWu6ZZnFWSjOGoOpRtOl4y1DsFtEOfksigmHQoFk4ExELRKJS6MdLDAYQCKHP/zgsS6KSvuJAFJSAE//g8o0RkcgufTBJTzLtGAF38TWNG4Ig4JhQFg8/R8U12HwoV1IxrL9QW4SsACYral8hzfv/5hkz1S9CWr9lhdFSpUpCIs/hhq9hVsx5iEmWo9b9s7QeaS5LAXdaNIIz21fzt2vtydll9YkQV5E5dZcaJvtQxl9YxL+dyzz3ves/133/kUDv5qHNyOni88+b+SymhqbvZ1bmOqOJTf/+9/+f/vnP/mE5nRy+ewuUGcot7l9rGKUti5uar01Xdexfs02P////OCxNlBlAJOX5nAAf/////+vw5+H/lMUTXJuH4fnpyUVKssl9W3Zs2cda1N152muyqV95Xq1LeR6OoAK33pvK6XcFUjbMONABDGuADSAIOumOQ1G2wuo6ztTtBUjcNzNXGuhzz1EZrA6VQSpA6sLI9zyRIv6YVVnyjJEijBzpHtvhz79MyaY+pjKaOk0M26zVRTGHlzMvv755nPOfP5zu7+vjWbEtuRT+sq32s7fbf685275XlvXxu//rd7N9zP/XfP8d88zuNr/l3/CV+jNaP/84LElicTgkFr2TABWQ+r3hXjan8KKShzE0H2zj4VkNKvtP3rc+fr2na/HXo7ARJNZf95JeooT5OlCsMSUrGVOUSFKVFLXvUWxfGUNR1JRGHVWCIIDopEyxKgFaEoRjjTyhxV5oXtlhuF7Wbn+z/j9nm/c2HrITy/UcvpffVWVhJvIbb4rfO7e1LPC8/j/X/qUrh4Q8vWLsa3CO3D55XC9uqKSZe6PTh7xmUczJ/EmmyCsOJ1OsfjzptL1RhKAAEH7Kwkx+PN7KDNmU4QbDhRLf/zgsS9KcvyNAFPSAEN8HDGGo1/AJAdFUiDzLF8wFQDFBOIOdpCIGFWMdsefhYYQSYY2WUU8xdNQ9DU2ZYzbERhFrqCqkWLATWiJcEMUKkGlov6XNfZYz+NzfR1GVpgJil8lV2XPtVt0lK1mmljOnhmJA0xuldh8lZ9Ypn1jzlOU+sQsOS1yjf6vKY24LLIFUeY2v5rMESCidmNO0/92kt5z+OGNNelWNegp56UvU+L/zNa1R5xiOWYfoa1NdsTVLS3tWpbUh6pcm8L0azx7yp3//OCxNlLLAosM5vQAVO8uT1XCXwBZhynppXNRmd3qVvtDMph3Xav/3/1lvdLSbl1PZu36a9qaqWorVs8r5fTZY/q/hSdk9DelEepZ+3qvTU9amlWNW9hlljj/dTOUqlwKjFIAZqhpAqj0WcBapotnBiDhjXOCpDSQ/YLJBEbooxLsXUhaGULN+QqTjgNw2mv9bfp4mVVIaVPG83Ta1DUKcF/n3fl8bUphLr36sCvo48JdR/m7NSqrXcB22CqbrkYlDzXHKg2IscbFH4OiUYlczL/84LEcEUMDhgBmcABtUDE1yqXuI60UksshCu2BvEuhmj0wp35bMQJI68vpY5WpLFjO3OROkl0sjcOwPLPwtVKlDXn6meF2mq6oaSlu1uzUz83DEFRWB7ta9OV+5WY3SyOWXuWsatzK9T8y+12cq4dmv7nvesssLv2aSmlF6klc/D9BLIxdytSyNwl26afsZ0tfVbkTmezFbuWsaOvR2e8+9flOWNJerU+W+b5cuX6WyrVe6IWGHQQLHLIDVAucMapYnyaAqmZEliu+HioCYcj0v/zgsQfL5wGHAGYYAHjwI1T66xSvR5515Vke8zXE6PkSbjAlrMTJnWUrB0eH58UBehwGCTGt6jWE0+Jhwhn6de+I5UqeGbSPGU6JNP05hQSEM/XoSJYsva1aN5aJfrU3nv2dmb/K9qOs3xzm47sORXYare9Kd9LVfpP02drPTM5+zW/Wn9tP1pbths4xC9GxLu9m7end+Z2TNdm07OT2zkzOvsfVuvuNT85PPsKGAMRL4qNBU6oy8BddOtlU8my/0ZZfEH3dUtCaGJqZFMzIgkN//OCxCQwE6YQAZhgATydhausvrCPvqwmLIKMwKsvdYgLDpBNRBIQlxe3uViVPPKavEk6gMyaVW71lJWBorD0bHLbpaeKQPksMSiTiqTFkDrrlXNitNKQb9Mn550tON9a11tWr+p7P+v/+TW3Wt9LT/3tN+rl2l0bDLTdoo7by2Bva22Y87Pnc7Zyls/LTWn0zqU6udvxJl13HYKs02DUJXRXvkQaYdiV72og5iRmFOq2qqGLRRJcxGdWv2t0zqxIKBlRSvZHdgF5E5KB1I0eBMH/84LEJykbqggJz0AASBgbJx4dh/jxFQoVHkEiC4sIquIJRsB2UnBYPh0VuIA1znhYOinUzFxQQBoiM4oZIhwzwPUUQ4kxz3DtZjsy7SruDsfjaqH7lMbojx2kwPrPu10ifneLMLsd1VxOev/W+19V9PEDeGeLH93VXaUpD776PEFgEDqGhsn2rn21SEP1GlsJGXYrrOFjilNK8OE3oTKizFYWpgMKG+coDFd5aI1ql+ooxxEpAh+A4EaOBUeKCi1FkTBwKcHwA0R5JI0+UXztr//zgsRGJ6vWCAp5hzVY+Koq5NndEiNpJBKZKxrk4Shml1ohZrSRDH5MA26MqD5AgGVhYQW6N7pV2MqjLPUzzbIrHvu7dtJyU/6TZ/DyYwjWxrzY1XOll5LDE5Nmx7YaCDA2kyViCgugLJKgLQlEu1t0Z8jle1SPG980LT9bWxocFm8E6b4rtyYQKlRO9RUNpqzGkFKoGbbptOVo0e0/toyOdrzOoyc2uTtTSycXz3dTTjr0cZSS0jNUGSjsILWEFQJISF6uCQd1eoFQjTaE5cSI//OCxGsovBH8AHpG3GV4Ky1IzdwwmKpizBx0ADINZoMSBjnMQOewhQCV+KAFHYGQY6rJS3EZhy2Tohid80MpxCUjFdMVgMNZ2gvDKmMDVWoTCNWrN4bKS47i9EVC4fg1JsQnHyq8VcuhrlFQSMjFbknXoZHRziWNKASy1JJERy2glTPGeqst9YmqdcNTPGMzwrx3zYymJZfftEOXOQ3JxTXpzoXpjFM3hvabvTWzR2yMJ/3Um42vMm3ryizOdCp4jUefneHrYg1A7G3ez2cXLbT/84LEjCj7/gACwwxd+3hJsvWKlzfe95imlR1HHV81M+LN1pI2MGJVNJ173BcRXykUCgVE14ajQxDHT9yZHqvgJMCNGxdQC5lGamjCgoLrtybaQZB1qYx27J6JEqeohR0w2uiPCM+CEW0hQShcVChWlROqToHbpPaBEpHbqF7cW9hU8/nByPWHXDItyhf2l3wjP/t9BP1fhDL/tK5+c8hD79/u/tf/1nlG/tZPz2FMT/3wbq931i+/bUwHSNPc6ZHjjCPd5YhJmkoAEMGMAARhhv/zgsSsKON2DAlPSAE4ls5Mzv1YljrmAs1Uy1w2Az/hMjZbtA3YMBQQAMH1agMyRBtIAY519QByQBIMLexNzKt6MG8oAx8CR8RqDY3Wv6/gWFjZDVYWliyCbFB9tf9rx1ClA9wc8wHMIaMmKX/7d/rb46B2DAHGTgoAU0MZgWDhqwxFfEIle3/7/2VbCxQBowFw5eC0ALUgFFwGlYYIDE4BRMMcC0wLWBYxZFr/0m+r1V9f/4coOscZClQvjjLBEC0bE4OwzdSJubo6hbAZbEt6//OCxMwxZA4xlZmgAU27HpMXAHJlUDOUjysU06Zfg5HC3S6m1viqIWMsOfPv0KyIErBRSHo/LKeNDYgUQ1xXi11hr7xeDF1p4IjoAojZgGl1TVcQMVBYwgQSryiUloa27UtgWmmyyyaLMmHLvUEnefVy3e+3TZVeU0ScJ9XZjDX5FDMSh6/hOZVcM7OdX7mN7DG1lcszNyVz0Zjz7ROWQy7XKbVurvmWrWef8/8cf3zePLnYjEYcd9+muv8yqCXYlkKkMMzU3z/q49x3zLL9f///84LEyj/T1npfmcAB46/eH/+X/l//L2gPfEqGGJBIp2HY1M3bFumpbVNjhjNU2H9yxy/9f+u63/95XqZU2r3wS3VqgB0kSSY9VLyOK6NSMaNCDKs6TRTppF6ZoChWV1GywwYT0TlHD4Y4OgHCIULB80Di7obNT50ogsx+TRrMPUxTeq9u6tSpiutvurb1nsxoUFcS2vO4VBWFQK06FSbRMHSoZlluHGFgEXLQoTmllWHqVW13FV155DJYYpPqeeUlyAj+asJBThL8cTC1pgL4A//zgsSOH8GeTPfPQABgHIvS5WBvITY/hbgAgDG1UxiYrTl1p5oQiatOTExiJRaZXet78XLhKcPoXWTExMerU5MXe1ZnV1CgKKqkpGFAQIUBDqsatUAjoUBAQJmYMBGq/wCFcZS///pTKgIpmbjYERqqrqrcDAQpgwEVVVVf6pRvDO6K1J/9dj03+y/wKNN+LQ9sV+T/xBnnbkxBTUUzLjEwMKqqqqqqt9rLjMN0ZAohMQhwUpDlaQVYX04A554ch2hORJUnQlE5MJR9CSSawSid//OCxNMmsvYUCnsG1RHQlKkpiewEo9gMjK5yYxHR660ZJORCYNIonEknIoubLHJOaR00iiUSXJtaaRiq02tkjLEtmtZyONVeiVmkcOJSUS15mqlq15yqxq1zcrf9ecY4lhxJJyMsdOUlTzPmcaqeZ8zlVrzszLVXmtmZYls7/Oet/rZnsS2iWzOVSTVWyjlHSxKnNRhVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/84LE7iycDYwEewyZVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=="></audio>
+<div id="banner"><h2 id="bannerTitle">Bravo !</h2><p id="bannerText">Tu as terminé l'aventure.</p><button id="restart">REJOUER</button></div>
+
+
+<div id="friendJoinPopup"><div class="bigFriendFace" id="joinFriendFace">🙂</div><h3 id="joinFriendName">Ami</h3><div id="joinFriendStatus" class="muted">Hors ligne</div><button id="joinFriendButton" style="display:none">▶ Rejoindre</button><button class="secondary" id="closeJoinFriend">Fermer</button></div>
+<script>
+(function(){
+ const quick=document.getElementById('accountQuickButton');
+ const modal=document.getElementById('accountModal');
+ const form=document.getElementById('accountModalCard');
+ const status=document.getElementById('accountStatus');
+ const userInput=document.getElementById('accountUsername');
+ const passInput=document.getElementById('accountPassword');
+ const close=document.getElementById('accountClose');
+ const create=document.getElementById('accountCreate');
+ const KEY='blockAdventureLocalAccountV1';
+ function getAccount(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+ function setStatus(t,ok){status.textContent=t;status.style.color=ok?'#16803b':'#c62828'}
+ function applyUser(name){
+   localStorage.setItem('blockAdventureDisplayName',name);
+   quick.textContent='👤 '+name;
+   const gameName=document.getElementById('gameProfileName'); if(gameName) gameName.textContent=name;
+   const signup=document.getElementById('signupScreen');
+   if(signup) signup.style.display='none';
+   const home=document.getElementById('homeScreen');
+   if(home) home.style.display='flex';
+ }
+ quick.addEventListener('click',()=>{
+   modal.style.display='flex';status.textContent='';
+   userInput.value=localStorage.getItem('blockAdventureDisplayName')||'';
+   passInput.value='';
+ });
+ close.addEventListener('click',()=>modal.style.display='none');
+ create.addEventListener('click',()=>{
+   const name=userInput.value.trim(), pw=passInput.value;
+   if(name.length<3){setStatus('Le pseudo doit contenir au moins 3 caractères.',false);return}
+   if(pw.length<8){setStatus('Choisis un mot de passe de 8 caractères minimum.',false);return}
+   // Prototype local uniquement : mot de passe enregistré localement, jamais réutiliser un vrai mot de passe.
+   localStorage.setItem(KEY,JSON.stringify({username:name,password:pw}));
+   applyUser(name);setStatus('Profil enregistré sur cet appareil.',true);
+   setTimeout(()=>{modal.style.display='none'},500);
+ });
+ form.addEventListener('submit',e=>{
+   e.preventDefault();
+   const account=getAccount(), name=userInput.value.trim(), pw=passInput.value;
+   if(!account){setStatus('Aucun profil enregistré. Clique sur « Créer / enregistrer ce profil ».',false);return}
+   if(account.username.toLowerCase()!==name.toLowerCase()||account.password!==pw){setStatus('Pseudo ou mot de passe incorrect.',false);return}
+   applyUser(account.username);setStatus('Connexion réussie !',true);
+   setTimeout(()=>{modal.style.display='none'},500);
+ });
+ const saved=localStorage.getItem('blockAdventureDisplayName');
+ if(saved){ quick.textContent='👤 '+saved; const gameName=document.getElementById('gameProfileName'); if(gameName) gameName.textContent=saved; }
+})();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<script>
+(() => {
+  const signupScreen=document.getElementById('signupScreen');
+  const signupForm=document.getElementById('signupCard');
+  const signupError=document.getElementById('signupError');
+  const birthInput=document.getElementById('signupBirth');
+  const chooser=document.getElementById('accountChooser');
+  const accountList=document.getElementById('accountList');
+  const chooserLogin=document.getElementById('chooserLogin');
+  const chooserUsername=document.getElementById('chooserUsername');
+  const chooserPassword=document.getElementById('chooserPassword');
+  const chooserError=document.getElementById('chooserError');
+  const ACCOUNTS_KEY='bibloxSavedAccountsV2';
+  const SESSION_KEY='blockAdventureDisplayName';
+  birthInput.max=new Date().toISOString().slice(0,10);
+  function getAccounts(){try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)||'[]')}catch(e){return []}}
+  function saveAccounts(a){localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(a))}
+  function showChooser(){chooser.style.display='block';signupForm.style.display='none';chooserLogin.style.display='none';renderAccounts()}
+  function renderAccounts(){
+    const accounts=getAccounts();
+    accountList.innerHTML='';
+    if(!accounts.length){
+      accountList.innerHTML='<div style="padding:25px 12px;color:#a3aab8;text-align:center">Aucun compte enregistré sur cet appareil.</div>';
+      return;
+    }
+    accounts.forEach(acc=>{
+      const row=document.createElement('div');row.className='savedAccount';
+      const avatar=document.createElement('div');avatar.className='savedAvatar';avatar.textContent='👤';
+      const info=document.createElement('div');info.className='savedInfo';
+      const name=document.createElement('div');name.className='savedName';name.textContent=acc.username;
+      const handle=document.createElement('div');handle.className='savedHandle';handle.textContent='@'+acc.username;
+      info.append(name,handle);
+      const logout=document.createElement('button');logout.className='savedLogout';logout.textContent=localStorage.getItem(SESSION_KEY)===acc.username?'Déconnexion':'Se connecter';
+      logout.addEventListener('click',()=>{
+        if(localStorage.getItem(SESSION_KEY)===acc.username){
+          localStorage.removeItem(SESSION_KEY);
+          document.body.classList.remove('has-session');
+          document.getElementById('homeScreen').style.display='none';
+          signupScreen.style.display='flex';
+          showChooser();
+        } else {
+          chooserLogin.style.display='block';chooserUsername.value=acc.username;chooserUsername.readOnly=true;
+          chooserPassword.value='';chooserError.style.display='none';
+          document.getElementById('chooserLoginTitle').textContent='Connexion à '+acc.username;
+        }
+      });
+      row.append(avatar,info,logout);accountList.appendChild(row);
+    });
+  }
+  // Actions de compte accessibles depuis le menu d'accueil
+  document.getElementById('menuDisconnect')?.addEventListener('click',()=>{
+    localStorage.removeItem(SESSION_KEY);
+    document.body.classList.remove('has-session');
+    document.getElementById('sidePanel').style.display='none';
+    document.getElementById('homeScreen').style.display='none';
+    signupScreen.style.display='flex';
+    showChooser();
+  });
+  document.getElementById('menuSwitchAccount')?.addEventListener('click',()=>{
+    document.getElementById('sidePanel').style.display='none';
+    document.getElementById('homeScreen').style.display='none';
+    signupScreen.style.display='flex';
+    showChooser();
+    chooserLogin.style.display='block';chooserUsername.readOnly=false;chooserUsername.value='';chooserPassword.value='';
+    chooserError.style.display='none';document.getElementById('chooserLoginTitle').textContent='Se connecter à un autre compte';
+  });
+  document.getElementById('chooseOtherAccount').addEventListener('click',()=>{
+    chooserLogin.style.display='block';chooserUsername.readOnly=false;chooserUsername.value='';chooserPassword.value='';
+    chooserError.style.display='none';document.getElementById('chooserLoginTitle').textContent='Se connecter à un autre compte';
+  });
+  document.getElementById('chooseCreateAccount').addEventListener('click',()=>{
+    chooser.style.display='none';signupForm.style.display='block';signupForm.reset();signupError.style.display='none';
+  });
+  document.getElementById('chooserBack').addEventListener('click',()=>{chooserLogin.style.display='none';chooserPassword.value='';});
+  document.getElementById('chooserLoginSubmit').addEventListener('click',()=>{
+    const name=chooserUsername.value.trim(),pw=chooserPassword.value;
+    const acc=getAccounts().find(a=>a.username.toLowerCase()===name.toLowerCase());
+    if(!acc||acc.password!==pw){chooserError.textContent='Pseudo ou mot de passe incorrect.';chooserError.style.display='block';return;}
+    localStorage.setItem(SESSION_KEY,acc.username);
+    document.getElementById('profileName').textContent=acc.username;
+    const gameName=document.getElementById('gameProfileName');if(gameName)gameName.textContent=acc.username;
+    document.body.classList.add('has-session');signupScreen.style.display='none';document.getElementById('homeScreen').style.display='flex';
+  });
+  signupForm.addEventListener('submit',e=>{
+    e.preventDefault();
+    const username=document.getElementById('signupUsername').value.trim();
+    const birth=birthInput.value;
+    const password=document.getElementById('signupPassword').value;
+    const confirm=document.getElementById('signupConfirm').value;
+    signupError.style.display='none';
+    if(username.length<3){signupError.textContent='L’identifiant doit contenir au moins 3 caractères.';signupError.style.display='block';return;}
+    if(!birth || new Date(birth)>new Date()){signupError.textContent='Choisis une date de naissance valide.';signupError.style.display='block';return;}
+    if(password.length<8){signupError.textContent='Le mot de passe doit contenir au moins 8 caractères.';signupError.style.display='block';return;}
+    if(password!==confirm){signupError.textContent='Les deux mots de passe ne correspondent pas. Réécris-les.';signupError.style.display='block';return;}
+    const accounts=getAccounts();
+    if(accounts.some(a=>a.username.toLowerCase()===username.toLowerCase())){signupError.textContent='Ce pseudo est déjà enregistré sur cet appareil.';signupError.style.display='block';return;}
+    accounts.push({username,password,birthdate:birth});saveAccounts(accounts);
+    localStorage.setItem(SESSION_KEY,username);
+    document.getElementById('profileName').textContent=username;
+    const gameName=document.getElementById('gameProfileName');if(gameName)gameName.textContent=username;
+    document.body.classList.add('has-session');
+    signupScreen.style.display='none';document.getElementById('homeScreen').style.display='flex';
+  });
+  const currentSession=localStorage.getItem(SESSION_KEY);
+  if(currentSession){
+    document.body.classList.add('has-session');
+    document.getElementById('profileName').textContent=currentSession;
+    const gameName=document.getElementById('gameProfileName');if(gameName)gameName.textContent=currentSession;
+    signupScreen.style.display='none';document.getElementById('homeScreen').style.display='flex';
+  } else {
+    signupScreen.style.display='flex';showChooser();
+  }
+  document.getElementById('addFriendButton').addEventListener('click',()=>alert('L’ajout d’amis nécessitera des comptes réels et un serveur. Cette maquette ne crée pas de faux amis.'));
+  const homeScreen=document.getElementById('homeScreen');
+  const sidePanel=document.getElementById('sidePanel');
+  let loadingTimer=null;
+  const loadingScreen=document.getElementById('loadingScreen');
+  const loadingProgress=document.getElementById('loadingProgress');
+  const loadingPercent=document.getElementById('loadingPercent');
+  const quitGame=document.getElementById('quitGame');
+  const quitConfirm=document.getElementById('quitConfirm');
+  const orientationNotice=document.getElementById('orientationNotice');
+  const updateGameOrientation=()=>{
+    const inGame = homeScreen.style.display==='none' && loadingScreen.style.display==='none';
+    orientationNotice.style.display = (inGame && window.matchMedia('(orientation: portrait)').matches) ? 'flex' : 'none';
+  };
+  const showGame=()=>{
+    loadingScreen.style.display='none';
+    chatToggle.style.display='block'; chatPanel.style.display='none'; chatToggle.setAttribute('aria-expanded','false');
+    document.body.classList.add('game-mode');
+    updateGameOrientation();
+    document.getElementById('controls').style.display='block';
+    document.getElementById('hud').style.display='block';
+    document.getElementById('help').style.display='block';
+    document.getElementById('desktopHint').style.display='block';
+    quitGame.style.display='block';
+  };
+  const startGame=(gameName='KEYBOARD Escape')=>{
+    try{localStorage.setItem('bibloxPresenceV1',JSON.stringify({username:localStorage.getItem('bibloxActiveSessionV2')||localStorage.getItem('blockAdventureDisplayName')||'Joueur',game:gameName,updated:Date.now()}));}catch(e){}
+    if(typeof selectMap==='function') selectMap(gameName);
+    document.getElementById('loadingTitle').textContent=gameName;
+    document.getElementById('title').textContent='';
+    document.getElementById('objective').textContent=gameName==='Steal a Brainrot'?'Map vide avec un tapis rouge au milieu, d’un mur à l’autre.':'Map vide : un sol continu et quatre murs.';
+    document.getElementById('status').textContent='Bienvenue dans '+gameName;
+    chatPanel.style.display='none'; chatToggle.style.display='none'; avatarChatBubble.style.display='none';
+    homeScreen.style.display='none';
+    sidePanel.style.display='none';
+    quitConfirm.style.display='none';
+    document.getElementById('controls').style.display='none';
+    document.getElementById('hud').style.display='none';
+    document.getElementById('help').style.display='none';
+    document.getElementById('desktopHint').style.display='none';
+    quitGame.style.display='none';
+    loadingScreen.style.display='flex';
+    loadingProgress.style.width='0%';
+    loadingPercent.textContent='Chargement : 0%';
+    let progress=0;
+    if(loadingTimer) clearInterval(loadingTimer);
+    loadingTimer=setInterval(()=>{
+      progress=Math.min(100,progress+4);
+      loadingProgress.style.width=progress+'%';
+      loadingPercent.textContent='Chargement : '+progress+'%';
+      if(progress>=100){
+        clearInterval(loadingTimer);
+        loadingTimer=null;
+        setTimeout(showGame,220);
+      }
+    },65);
+  };
+  document.querySelectorAll('.playGameBtn').forEach(btn=>btn.addEventListener('click',()=>startGame(btn.dataset.game))); 
+  window.addEventListener('resize',updateGameOrientation);
+  window.addEventListener('orientationchange',updateGameOrientation);
+  quitGame.addEventListener('click',()=>{quitConfirm.style.display='flex';});
+  document.getElementById('quitNo').addEventListener('click',()=>{quitConfirm.style.display='none';});
+  document.getElementById('quitYes').addEventListener('click',()=>{
+    quitConfirm.style.display='none';
+    quitGame.style.display='none';
+    chatPanel.style.display='none'; chatToggle.style.display='none'; chatToggle.setAttribute('aria-expanded','false'); avatarChatBubble.style.display='none';
+    loadingScreen.style.display='none';
+    document.getElementById('controls').style.display='none';
+    document.getElementById('hud').style.display='none';
+    document.getElementById('help').style.display='none';
+    document.getElementById('desktopHint').style.display='none';
+    document.getElementById('banner').style.display='none';
+    document.getElementById('homeScreen').style.display='flex';
+    try{localStorage.removeItem('bibloxPresenceV1')}catch(e){}
+    document.body.classList.remove('game-mode');
+    orientationNotice.style.display='none';
+    if(loadingTimer){clearInterval(loadingTimer);loadingTimer=null;}
+    resetGame();
+  });
+  document.getElementById('homeMenuIcon').addEventListener('click',()=>sidePanel.style.display='block');
+  document.getElementById('closePanel').addEventListener('click',()=>sidePanel.style.display='none');
+  sidePanel.addEventListener('click',e=>{if(e.target===sidePanel)sidePanel.style.display='none';});
+  document.querySelectorAll('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>{
+    document.querySelectorAll('[data-nav]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const label=btn.dataset.nav;
+    if(label==='Accueil') return;
+    if(label==='Avatar') { document.getElementById('avatarEditor').style.display='block'; loadAvatarSettings(); }
+    else if(label==='Chat') { alert('Le chat est disponible pendant une partie. Lance un jeu puis appuie sur CHAT.'); }
+    else if(label==='Découvrir') alert('Choisis un jeu dans la liste pour lancer sa map.');
+  }));
+  // Système d'amis local : les profils correspondent aux comptes créés sur cet appareil.
+  (()=>{
+    const modal=document.getElementById('friendsModal'), search=document.getElementById('friendSearch');
+    const FRIENDS_KEY='bibloxFriendDataV1', ACCOUNTS_KEY='bibloxSavedAccountsV2', SESSION_KEY='bibloxActiveSessionV2';
+    const current=()=>localStorage.getItem(SESSION_KEY)||localStorage.getItem('blockAdventureDisplayName')||'';
+    const accounts=()=>{try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)||'[]')}catch(e){return []}};
+    const read=()=>{try{return JSON.parse(localStorage.getItem(FRIENDS_KEY)||'{}')}catch(e){return {}}};
+    const write=d=>localStorage.setItem(FRIENDS_KEY,JSON.stringify(d));
+    const key=n=>String(n||'').trim().toLowerCase();
+    const list=(d,n)=>{const k=key(n);if(!d[k])d[k]={friends:[],incoming:[],outgoing:[]};return d[k]};
+    const row=(name,detail,action,cls='')=>{const el=document.createElement('div');el.className='friendRow';const face=document.createElement('div');face.className='friendAvatar';face.textContent='🙂';const text=document.createElement('div');text.className='friendText';const strong=document.createElement('strong');strong.textContent=name;text.appendChild(strong);if(detail){const small=document.createElement('div');small.className='muted';small.textContent=detail;text.appendChild(small)}el.append(face,text);if(action){const b=document.createElement('button');b.className='friendAction '+cls;b.textContent=action.label;b.addEventListener('click',action.run);el.appendChild(b)}return el};
+    const empty=(container,msg)=>{container.innerHTML='';const d=document.createElement('div');d.className='friendNotice';d.textContent=msg;container.appendChild(d)};
+    function renderSearch(){const out=document.getElementById('friendSearchResults'),q=key(search.value),me=current();out.innerHTML='';if(!q){empty(out,'Tape un pseudo pour rechercher un profil.');return}if(q===key(me)){empty(out,'C’est ton propre profil.');return}const acc=accounts().find(a=>key(a.username)===q);if(!acc){empty(out,'Aucun joueur trouvé avec ce pseudo.');return}const data=read(),mine=list(data,me),their=list(data,acc.username);let action;if(mine.friends.includes(q)){action={label:'✓ Déjà ami',run:()=>{},};}else if(mine.outgoing.includes(q)){action={label:'Demande envoyée',run:()=>{},};}else if(mine.incoming.includes(q)){action={label:'Accepter',run:()=>{mine.incoming=mine.incoming.filter(x=>x!==q);their.outgoing=their.outgoing.filter(x=>x!==key(me));if(!mine.friends.includes(q))mine.friends.push(q);if(!their.friends.includes(key(me)))their.friends.push(key(me));write(data);renderAll();renderSearch();}}}else{action={label:'+ Ajouter',run:()=>{mine.outgoing.push(q);their.incoming.push(key(me));write(data);renderAll();renderSearch();}}}out.appendChild(row(acc.username,'Profil BIBLOX',action,action.label==='✓ Déjà ami'?'secondary':''));}
+    function renderHomeFriends(){const host=document.getElementById('friendsRow');if(!host)return;const data=read(),me=current(),mine=list(data,me);host.innerHTML='';host.className='';const popup=document.getElementById('friendJoinPopup');const close=document.getElementById('closeJoinFriend');close.onclick=()=>popup.style.display='none';mine.friends.forEach(k=>{const acc=accounts().find(a=>key(a.username)===k);if(!acc)return;const bubble=document.createElement('button');bubble.className='friend';bubble.style.border='0';bubble.style.background='transparent';bubble.style.padding='0';bubble.style.color='inherit';const face=document.createElement('div');face.className='friendFace';face.textContent='🧑';let presence=null;try{presence=JSON.parse(localStorage.getItem('bibloxPresenceV1')||'null')}catch(e){}const online=presence&&key(presence.username)===k&&Date.now()-presence.updated<120000;if(online)face.classList.add('isOnline');const label=document.createElement('div');label.textContent=acc.username;bubble.append(face,label);bubble.onclick=()=>{document.getElementById('joinFriendFace').textContent='🧑';document.getElementById('joinFriendName').textContent=acc.username;document.getElementById('joinFriendStatus').textContent=online?'En jeu : '+presence.game:'Hors ligne';const join=document.getElementById('joinFriendButton');join.style.display=online?'inline-block':'none';join.onclick=()=>{popup.style.display='none';startGame(presence.game)};popup.style.display='block'};host.appendChild(bubble)});if(!mine.friends.length){host.className='friendsEmpty';const icon=document.createElement('div');icon.className='emptyFriendsIcon';icon.textContent='♧';const wrap=document.createElement('div');const strong=document.createElement('strong');strong.textContent='Pas encore d’amis';const sub=document.createElement('div');sub.className='tinySub';sub.textContent='Tes amis apparaîtront ici quand tu en ajouteras.';wrap.append(strong,sub);const add=document.createElement('button');add.id='addFriendButton';add.textContent='Ajouter';add.onclick=open;host.append(icon,wrap,add)}}
+    function renderAll(){const data=read(),me=current(),mine=list(data,me);write(data);renderHomeFriends();const incoming=document.getElementById('incomingRequests'),outgoing=document.getElementById('outgoingRequests'),friends=document.getElementById('myFriendsList');incoming.innerHTML='';outgoing.innerHTML='';friends.innerHTML='';let count=0;mine.incoming.forEach(k=>{const acc=accounts().find(a=>key(a.username)===k);if(!acc)return;count++;incoming.appendChild(row(acc.username,'Souhaite devenir ton ami',{label:'Accepter',run:()=>{const other=list(data,acc.username);mine.incoming=mine.incoming.filter(x=>x!==k);other.outgoing=other.outgoing.filter(x=>x!==key(me));if(!mine.friends.includes(k))mine.friends.push(k);if(!other.friends.includes(key(me)))other.friends.push(key(me));write(data);renderAll();renderSearch();}}));incoming.lastChild.appendChild(Object.assign(document.createElement('button'),{className:'friendAction secondary',textContent:'Refuser',onclick:()=>{mine.incoming=mine.incoming.filter(x=>x!==k);list(data,acc.username).outgoing=list(data,acc.username).outgoing.filter(x=>x!==key(me));write(data);renderAll();}}));});if(!count)empty(incoming,'Personne ne t’a ajouté pour le moment.');count=0;mine.outgoing.forEach(k=>{const a=accounts().find(x=>key(x.username)===k);if(!a)return;count++;outgoing.appendChild(row(a.username,'Demande en attente',null));});if(!count)empty(outgoing,'Tu n’as envoyé aucune demande.');count=0;mine.friends.forEach(k=>{const a=accounts().find(x=>key(x.username)===k);if(!a)return;count++;friends.appendChild(row(a.username,'Ami', {label:'Retirer',run:()=>{mine.friends=mine.friends.filter(x=>x!==k);list(data,a.username).friends=list(data,a.username).friends.filter(x=>x!==key(me));write(data);renderAll();renderSearch();}},'secondary'));});if(!count)empty(friends,'Tu n’as pas encore d’amis.');}
+    function open(){modal.style.display='flex';search.value='';renderAll();renderSearch();}
+    document.getElementById('friendsClose').addEventListener('click',()=>modal.style.display='none');modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none'});search.addEventListener('input',renderSearch);
+    document.getElementById('addFriendButton')?.addEventListener('click',open);window.addEventListener('storage',e=>{if(e.key==='bibloxPresenceV1'||e.key===FRIENDS_KEY)renderAll()});setInterval(()=>{if(document.getElementById('homeScreen').style.display==='flex')renderHomeFriends()},5000);
+    document.querySelectorAll('[data-panel]').forEach(btn=>btn.addEventListener('click',()=>{if(['Ajouter des amis','Amis'].includes(btn.dataset.panel)){sidePanel.style.display='none';open()}else alert(btn.dataset.panel+' : cette section arrive bientôt.')}));
+  })();
+  document.getElementById('homeSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){const q=e.target.value.trim().toLowerCase();const card=[...document.querySelectorAll('.playGameBtn')].find(b=>b.dataset.game.toLowerCase().includes(q));if(card)card.click();else alert('Aucun jeu trouvé. Essaie Brainrot, Egg, Keyboard ou Swing Obby.');}});
+  const chatToggle=document.getElementById('chatToggle');
+  const chatPanel=document.getElementById('chatPanel');
+  const chatInput=document.getElementById('chatInput');
+  const chatMessages=document.getElementById('chatMessages');
+  const avatarChatBubble=document.getElementById('avatarChatBubble');
+  let bubbleUntil=0;
+  chatToggle.addEventListener('click',()=>{const open=chatPanel.style.display!=='flex';chatPanel.style.display=open?'flex':'none';chatToggle.setAttribute('aria-expanded',String(open));if(open)chatInput.focus();});
+  document.getElementById('chatClose').addEventListener('click',()=>{chatPanel.style.display='none';chatToggle.setAttribute('aria-expanded','false');});
+  document.getElementById('chatForm').addEventListener('submit',e=>{e.preventDefault();const msg=chatInput.value.trim();if(!msg)return;const line=document.createElement('div');line.className='chatLine';const name=document.createElement('b');name.textContent=(localStorage.getItem('blockAdventureDisplayName')||'Moi')+':';line.appendChild(name);line.appendChild(document.createTextNode(msg));chatMessages.appendChild(line);chatMessages.scrollTop=chatMessages.scrollHeight;avatarChatBubble.textContent=msg;avatarChatBubble.style.display='block';bubbleUntil=performance.now()+4500;chatInput.value='';});
+  chatInput.addEventListener('pointerdown',e=>e.stopPropagation());
+  chatPanel.addEventListener('pointerdown',e=>e.stopPropagation());
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 38, 115);
+  const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 250);
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xdff4ff,0x56734a,2.0));
+  const sun = new THREE.DirectionalLight(0xffffff,2.2);
+  sun.position.set(-12,25,10); sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.camera.left=-45; sun.shadow.camera.right=45; sun.shadow.camera.top=45; sun.shadow.camera.bottom=-45;
+  scene.add(sun);
+
+  const mat = (color, roughness=0.9, metalness=0) => new THREE.MeshStandardMaterial({color,roughness,metalness});
+  const grass=mat(0x4a183d), grass2=mat(0xf05aa8), dirt=mat(0x5c294f), stone=mat(0xf4d9e8), wood=mat(0x8b5a2b), leaf=mat(0xff80bf), leaf2=mat(0xffb5d9), gold=mat(0xffd43b,0.28,0.15), crystalMat=mat(0x48e5ff,0.2,0.25), white=mat(0xffffff), dark=mat(0x27364b), blue=mat(0xff63b8,0.25,0.15), portalMat=new THREE.MeshStandardMaterial({color:0xff65ba,emissive:0xff168d,emissiveIntensity:1.8,transparent:true,opacity:0.72});
+  const boxGeo=new THREE.BoxGeometry(1,1,1);
+  function box(name,x,y,z,sx,sy,sz,material,receive=true){
+    const o=new THREE.Mesh(boxGeo,material);o.name=name;o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;o.receiveShadow=receive;scene.add(o);return o;
+  }
+  // Chaque jeu possède sa propre map isolée : sol plat + quatre murs, sans objets ni décor.
+  const platforms=[];
+  const crystals=[]; // conservé vide pour compatibilité avec le reste du script
+  let portal=null;
+  const mapGroups={};
+  const roomMaterials={
+    'Steal a Brainrot':mat(0x555b66),
+    'Steal a Egg':mat(0x59616b),
+    'KEYBOARD Escape':mat(0x555b66),
+    'Swing Obby for Brainrots':mat(0x555b66),
+    'Block Adventure 3D':mat(0x555b66),
+    'Obby coloré':mat(0x555b66),
+    'Survie en nature':mat(0x555b66),
+    'Super aventure':mat(0x555b66)
+  };
+  const roomWidth=100, roomDepth=80, wallHeight=10, wallThickness=1;
+  for(const [gameName,floorMat] of Object.entries(roomMaterials)){
+    const g=new THREE.Group();g.name='map-'+gameName;scene.add(g);mapGroups[gameName]=g;
+    const floor=new THREE.Mesh(new THREE.BoxGeometry(roomWidth,.6,roomDepth),floorMat);floor.position.set(0,-.3,0);floor.receiveShadow=true;g.add(floor);
+    const wallMat=mat(0x303642);
+    const walls=[
+      [0,wallHeight/2,-roomDepth/2,roomWidth,wallHeight,wallThickness],
+      [0,wallHeight/2,roomDepth/2,roomWidth,wallHeight,wallThickness],
+      [-roomWidth/2,wallHeight/2,0,wallThickness,wallHeight,roomDepth],
+      [roomWidth/2,wallHeight/2,0,wallThickness,wallHeight,roomDepth]
+    ];
+    walls.forEach(([x,y,z,w,h,d])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat);m.position.set(x,y,z);m.receiveShadow=true;g.add(m);});
+    if(gameName==='Steal a Brainrot'){
+      const carpet=new THREE.Mesh(new THREE.BoxGeometry(8,.035,roomDepth-1.8),mat(0xd71932));
+      carpet.name='red-carpet-wall-to-wall';carpet.position.set(0,.02,0);g.add(carpet);
+    }
+    g.visible=(gameName==='KEYBOARD Escape');
+  }
+  let currentGame='KEYBOARD Escape';
+  function selectMap(gameName){
+    currentGame=roomMaterials[gameName]?gameName:'KEYBOARD Escape';
+    Object.entries(mapGroups).forEach(([name,g])=>g.visible=name===currentGame);
+    if(typeof avatar!=='undefined') avatar.position.set(0,0,8);
+    if(typeof y!=='undefined'){y=0;vy=0;onGround=true;}
+    cameraYaw=0;cameraPitch=.22;
+  }
+
+  // Avatar bloc avec pivots animés
+  const avatar=new THREE.Group();scene.add(avatar);
+  function part(parent,w,h,d,color,x,y,z){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;
+  }
+  const avatarParts={skin:[],shirt:[],pants:[],hair:[]};
+  const skin=0xffc994, shirt=0x2878e8, pants=0x263c68;
+  const torso=part(avatar,1.05,1.05,.55,shirt,0,1.65,0);avatarParts.shirt.push(torso);
+  const head=part(avatar,.78,.78,.72,skin,0,2.62,0);avatarParts.skin.push(head);
+  const hairCap=part(avatar,.8,.18,.75,0x7436c8,0,3.02,-.01);avatarParts.hair.push(hairCap);
+  // Cheveux en blocs personnalisables
+  [part(avatar,.72,.22,.72,0x7b3fe4,0,3.13,-.02),part(avatar,.22,.48,.26,0x6330c5,-.31,2.92,-.18),part(avatar,.22,.58,.26,0x8d4ff0,.30,2.87,-.18),part(avatar,.20,.35,.22,0x7135d4,.05,3.22,-.18)].forEach(o=>avatarParts.hair.push(o));
+  part(avatar,.12,.12,.07,0x202020,-.17,2.68,.37);part(avatar,.12,.12,.07,0x202020,.17,2.68,.37);
+  part(avatar,.28,.07,.07,0x9a3b37,0,2.43,.38);
+  const leftArm=new THREE.Group();leftArm.position.set(-.68,2.02,0);avatar.add(leftArm);avatarParts.skin.push(part(leftArm,.34,.95,.38,skin,0,-.42,0));
+  const rightArm=new THREE.Group();rightArm.position.set(.68,2.02,0);avatar.add(rightArm);avatarParts.skin.push(part(rightArm,.34,.95,.38,skin,0,-.42,0));
+  const leftLeg=new THREE.Group();leftLeg.position.set(-.28,1.15,0);avatar.add(leftLeg);avatarParts.pants.push(part(leftLeg,.42,.95,.45,pants,0,-.43,0));
+  const rightLeg=new THREE.Group();rightLeg.position.set(.28,1.15,0);avatar.add(rightLeg);avatarParts.pants.push(part(rightLeg,.42,.95,.45,pants,0,-.43,0));
+
+
+  function syncPreviewAvatar(){const src=[],dst=[];avatar.traverse(o=>{if(o.isMesh)src.push(o)});previewAvatar.traverse(o=>{if(o.isMesh)dst.push(o)});src.forEach((o,i)=>{const d=dst[i];if(!d)return;d.visible=o.visible;d.scale.copy(o.scale);d.position.copy(o.position);d.rotation.copy(o.rotation);if(o.material&&d.material)d.material.color.copy(o.material.color);});}
+
+  const AVATAR_KEY='bibloxAvatarSettings';
+  const defaultAvatarSettings={skin:'#ffc994',shirt:'#2878e8',pants:'#263c68',hair:'#7b3fe4',hairStyle:'classic',hat:'none',accessory:'none',arms:'normal',legs:'normal'};
+  let avatarSettings={...defaultAvatarSettings};
+  const hairMeshes=avatarParts.hair.slice();
+  const addOn=new THREE.Group();avatar.add(addOn);
+  const hatMeshes={
+    cap:[part(addOn,.82,.16,.78,0xe34b55,0,3.18,0),part(addOn,.58,.07,.36,0xc83240,0,3.12,.36)],
+    crown:[part(addOn,.7,.18,.65,0xf5c542,0,3.19,0),part(addOn,.12,.2,.12,0xf5c542,-.22,3.36,0),part(addOn,.12,.2,.12,0xf5c542,0,3.36,0),part(addOn,.12,.2,.12,0xf5c542,.22,3.36,0)],
+    wizard:[part(addOn,.7,.12,.65,0x5936b5,0,3.15,0),part(addOn,.42,.65,.42,0x5936b5,0,3.48,0)]
+  };
+  const accessoryMeshes={
+    glasses:[part(addOn,.25,.12,.08,0x202631,-.17,2.68,.42),part(addOn,.25,.12,.08,0x202631,.17,2.68,.42),part(addOn,.12,.045,.06,0xe7edf7,0,2.68,.45)],
+    wings:[part(addOn,.18,.75,.18,0x8dd9ff,-.67,2.0,-.25),part(addOn,.18,.75,.18,0x8dd9ff,.67,2.0,-.25)],
+    backpack:[part(addOn,.58,.65,.25,0xe4a044,0,1.72,-.4)]
+  };
+  const armMeshes=[leftArm.children[0],rightArm.children[0]], legMeshes=[leftLeg.children[0],rightLeg.children[0]];
+
+  // Aperçu 3D indépendant : montre le même avatar bloc que celui utilisé en jeu.
+  const avatarPreviewEl=document.getElementById('avatarPreview');
+  const previewScene=new THREE.Scene();
+  previewScene.background=null;
+  previewScene.add(new THREE.HemisphereLight(0xffffff,0x536078,2.2));
+  const previewLight=new THREE.DirectionalLight(0xffffff,2.3);previewLight.position.set(-3,6,5);previewScene.add(previewLight);
+  const previewCamera=new THREE.PerspectiveCamera(34,1,.1,30);previewCamera.position.set(0,2.15,8.4);previewCamera.lookAt(0,1.65,0);
+  const previewRenderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
+  previewRenderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  previewRenderer.setClearColor(0x000000,0);
+  avatarPreviewEl.appendChild(previewRenderer.domElement);
+  const previewAvatar=avatar.clone(true);previewAvatar.position.set(0,0,0);previewAvatar.rotation.set(0,-.18,0);previewScene.add(previewAvatar);
+  function resizeAvatarPreview(){const w=Math.max(1,avatarPreviewEl.clientWidth),h=Math.max(1,avatarPreviewEl.clientHeight);previewRenderer.setSize(w,h,false);previewCamera.aspect=w/h;previewCamera.updateProjectionMatrix();}
+  resizeAvatarPreview();
+  if(typeof ResizeObserver!=='undefined')new ResizeObserver(resizeAvatarPreview).observe(avatarPreviewEl);
+  let previewDragX=null;avatarPreviewEl.addEventListener('pointerdown',e=>{previewDragX=e.clientX;avatarPreviewEl.setPointerCapture?.(e.pointerId);});avatarPreviewEl.addEventListener('pointermove',e=>{if(previewDragX===null)return;const dx=e.clientX-previewDragX;previewDragX=e.clientX;previewAvatar.rotation.y+=dx*.012;});['pointerup','pointercancel','pointerleave'].forEach(ev=>avatarPreviewEl.addEventListener(ev,()=>previewDragX=null));
+
+  function applyAvatarSettings(){
+    ['skin','shirt','pants','hair'].forEach(g=>avatarParts[g].forEach(o=>o.material.color.set(avatarSettings[g]||defaultAvatarSettings[g])));
+    hairMeshes.forEach((o,i)=>{o.visible=avatarSettings.hairStyle==='none'?false:avatarSettings.hairStyle==='long'?i>=1:avatarSettings.hairStyle==='spiky'?i===0||i===3: true;});
+    Object.entries(hatMeshes).forEach(([k,arr])=>arr.forEach(o=>o.visible=avatarSettings.hat===k));
+    Object.entries(accessoryMeshes).forEach(([k,arr])=>arr.forEach(o=>o.visible=avatarSettings.accessory===k));
+    const armScale=avatarSettings.arms==='short'?.72:avatarSettings.arms==='long'?1.3:1;
+    armMeshes.forEach(o=>{o.scale.y=armScale;o.position.y=-.42*armScale;});
+    const legScale=avatarSettings.legs==='short'?.75:1;
+    legMeshes.forEach(o=>{o.scale.y=legScale;o.position.y=-.43*legScale;});
+    if(avatarSettings.legs==='boots') legMeshes.forEach(o=>{o.scale.set(1.25,1,1.25);}); else legMeshes.forEach(o=>{o.scale.x=1;o.scale.z=1;});
+    document.querySelectorAll('[data-choice]').forEach(group=>group.querySelectorAll('.avatarChoice').forEach(btn=>btn.classList.toggle('selected',btn.dataset.value===avatarSettings[group.dataset.choice])));
+    // Répercute les choix sur la copie 3D affichée dans l'éditeur.
+    previewAvatar.traverse((obj)=>{if(obj.isMesh){const live=avatar.getObjectByName(obj.name);}});
+    syncPreviewAvatar();
+  }
+  function loadAvatarSettings(){try{avatarSettings={...defaultAvatarSettings,...JSON.parse(localStorage.getItem(AVATAR_KEY)||'{}')};}catch(e){avatarSettings={...defaultAvatarSettings};}applyAvatarSettings();}
+  document.querySelectorAll('[data-choice] .avatarChoice').forEach(btn=>btn.addEventListener('click',()=>{avatarSettings[btn.closest('[data-choice]').dataset.choice]=btn.dataset.value;applyAvatarSettings();}));
+  document.querySelectorAll('.avatarTab').forEach(tab=>tab.addEventListener('click',()=>{document.querySelectorAll('.avatarTab').forEach(t=>t.classList.toggle('active',t===tab));document.querySelectorAll('.avatarGroup').forEach(g=>g.classList.toggle('active',g.dataset.group===tab.dataset.tab));document.getElementById('avatarSaved').textContent='';}));
+  document.getElementById('avatarSave').addEventListener('click',()=>{
+    try{localStorage.setItem(AVATAR_KEY,JSON.stringify(avatarSettings));document.getElementById('avatarSaved').textContent='Avatar enregistré sur cet appareil !';}
+    catch(e){document.getElementById('avatarSaved').textContent='Impossible de sauvegarder sur cet appareil.';}
+  });
+  document.getElementById('avatarEditorClose').addEventListener('click',()=>document.getElementById('avatarEditor').style.display='none');
+  document.getElementById('avatarEditor').addEventListener('click',e=>{if(e.target.id==='avatarEditor')e.currentTarget.style.display='none';});
+  loadAvatarSettings();
+  let y=0, vy=0, onGround=true, jumpPower=8.4, gravity=21;
+  let moveX=0,moveY=0,walkPhase=0, cameraYaw=0, cameraPitch=.22, moving=false;
+  let collected=0, won=false;
+  const countEl=document.getElementById('count'),statusEl=document.getElementById('status');
+  const banner=document.getElementById('banner'),bannerTitle=document.getElementById('bannerTitle'),bannerText=document.getElementById('bannerText');
+  avatar.position.set(0,0,2);
+  // Connexion multijoueur BIBLOX via le serveur Render.
+  const remotePlayers = new Map();
+  let multiplayerSocket = null, lastNetworkSend = 0;
+  function addRemotePlayer(p) {
+    if (!p || !p.id || p.id === (multiplayerSocket && multiplayerSocket.id)) return;
+    if (remotePlayers.has(p.id)) { updateRemotePlayer(p); return; }
+    const model = avatar.clone(true);
+    model.position.set(Number(p.x)||0, Number(p.y)||0, Number(p.z)||0);
+    model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); } });
+    scene.add(model); remotePlayers.set(p.id, model);
+  }
+  function updateRemotePlayer(p) {
+    const model = remotePlayers.get(p.id); if (!model) { addRemotePlayer(p); return; }
+    if (Number.isFinite(p.x)) model.position.x = p.x;
+    if (Number.isFinite(p.y)) model.position.y = p.y;
+    if (Number.isFinite(p.z)) model.position.z = p.z;
+  }
+  try {
+    if (window.io) {
+      multiplayerSocket = window.io('https://biblox-multiplayer.onrender.com', { transports: ['websocket','polling'] });
+      multiplayerSocket.on('connect', () => {
+        const username = localStorage.getItem('bibloxActiveSessionV2') || localStorage.getItem('blockAdventureDisplayName') || 'Joueur';
+        multiplayerSocket.emit('joinGame', { username, game: currentGame || 'KEYBOARD Escape' });
+        const status = document.getElementById('status');
+        if (status) status.textContent = 'Multijoueur connecté · ' + status.textContent;
+      });
+      multiplayerSocket.on('players', list => (list || []).forEach(addRemotePlayer));
+      multiplayerSocket.on('playerJoined', addRemotePlayer);
+      multiplayerSocket.on('playerMoved', updateRemotePlayer);
+      multiplayerSocket.on('playerLeft', p => { const m=remotePlayers.get(p.id); if(m){scene.remove(m);remotePlayers.delete(p.id);} });
+      multiplayerSocket.on('connect_error', () => { const status=document.getElementById('status'); if(status && !status.textContent.includes('Multijoueur')) status.textContent='Mode solo · serveur indisponible'; });
+    }
+  } catch (e) { console.warn('Connexion multijoueur indisponible', e); }
+  const clock=new THREE.Clock();
+  const jumpAudio=document.getElementById('jumpAudio');
+  const walkAudio=document.getElementById('walkAudio');
+  jumpAudio.volume=0.85;
+  walkAudio.volume=0.45;
+  let jumpCtx=null;
+  function playJumpAudio(){
+    try {
+      const Ctx=window.AudioContext||window.webkitAudioContext;
+      if(!Ctx)return;
+      if(!jumpCtx)jumpCtx=new Ctx();
+      if(jumpCtx.state==='suspended')jumpCtx.resume();
+      const t=jumpCtx.currentTime;
+      const osc=jumpCtx.createOscillator(), gain=jumpCtx.createGain();
+      osc.type='sine';
+      osc.frequency.setValueAtTime(520,t);
+      osc.frequency.exponentialRampToValueAtTime(980,t+.07);
+      osc.frequency.exponentialRampToValueAtTime(340,t+.23);
+      gain.gain.setValueAtTime(.0001,t);
+      gain.gain.exponentialRampToValueAtTime(.24,t+.012);
+      gain.gain.exponentialRampToValueAtTime(.0001,t+.25);
+      osc.connect(gain);gain.connect(jumpCtx.destination);
+      osc.start(t);osc.stop(t+.26);
+    } catch(e) {}
+  }
+  function updateWalkAudio(shouldPlay){
+    if(shouldPlay){
+      if(walkAudio.paused){ const p=walkAudio.play(); if(p&&p.catch)p.catch(()=>{}); }
+    } else if(!walkAudio.paused){
+      walkAudio.pause(); walkAudio.currentTime=0;
+    }
+  }
+  function jump(e){
+    if(e)e.preventDefault();
+    if(onGround&&!won){playJumpAudio();updateWalkAudio(false);vy=jumpPower;onGround=false;statusEl.textContent=`Touches : ${collected}/10 · Saute vers la prochaine plateforme !`;}
+    // Aucun son n'est joué par le bouton de saut.
+  }
+  document.getElementById('jump').addEventListener('pointerdown',jump);
+  // Joystick tactile
+  const base=document.getElementById('stickBase'),knob=document.getElementById('stick');
+  let stickId=null,baseRect=null;
+  function setStick(e){
+    baseRect=base.getBoundingClientRect();
+    const cx=baseRect.left+baseRect.width/2,cy=baseRect.top+baseRect.height/2;
+    let dx=e.clientX-cx,dy=e.clientY-cy;
+    const max=baseRect.width*.32,len=Math.hypot(dx,dy);
+    if(len>max){dx=dx/len*max;dy=dy/len*max;}
+    knob.style.left=(baseRect.width/2-27+dx)+'px';knob.style.top=(baseRect.height/2-27+dy)+'px';
+    moveX=dx/max;moveY=dy/max;
+  }
+  base.addEventListener('pointerdown',e=>{e.preventDefault();stickId=e.pointerId;base.setPointerCapture(stickId);setStick(e);});
+  base.addEventListener('pointermove',e=>{if(e.pointerId===stickId)setStick(e);});
+  function releaseStick(e){if(e.pointerId!==stickId)return;stickId=null;moveX=moveY=0;knob.style.left='33px';knob.style.top='33px';}
+  base.addEventListener('pointerup',releaseStick);base.addEventListener('pointercancel',releaseStick);
+  // Caméra orbitale au glissement en dehors des contrôles
+  let dragging=false,lastX=0,lastY=0,cameraDistance=8.5,pinchStartDistance=0,pinchStartZoom=8.5;
+  const activePointers=new Map();
+  const pinchDistance=()=>{const pts=[...activePointers.values()];return pts.length>=2?Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y):0;};
+  renderer.domElement.addEventListener('pointerdown',e=>{activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(activePointers.size>=2){pinchStartDistance=pinchDistance();pinchStartZoom=cameraDistance;dragging=false;}else{dragging=true;lastX=e.clientX;lastY=e.clientY;}try{renderer.domElement.setPointerCapture(e.pointerId);}catch(_){}});
+  renderer.domElement.addEventListener('pointermove',e=>{if(!activePointers.has(e.pointerId))return;activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(activePointers.size>=2){const d=pinchDistance();if(pinchStartDistance>0)cameraDistance=Math.max(3.5,Math.min(18,pinchStartZoom*pinchStartDistance/Math.max(1,d)));dragging=false;return;}if(!dragging)return;cameraYaw-=(e.clientX-lastX)*.006;cameraPitch=Math.max(-.05,Math.min(.7,cameraPitch+(e.clientY-lastY)*.004));lastX=e.clientX;lastY=e.clientY;});
+  function endCameraPointer(e){activePointers.delete(e.pointerId);if(activePointers.size<2){pinchStartDistance=0;const remaining=[...activePointers.values()][0];if(remaining){dragging=true;lastX=remaining.x;lastY=remaining.y;}else dragging=false;}}
+  renderer.domElement.addEventListener('pointerup',endCameraPointer);
+  renderer.domElement.addEventListener('pointercancel',endCameraPointer);
+  const keys={};
+  addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'){e.preventDefault();jump(e);}});
+  addEventListener('keyup',e=>keys[e.code]=false);
+  // Surfaces de plateforme pour l'atterrissage
+  const landings=[{x:0,z:0,w:46,d:34,y:0}];
+  function resetGame(){
+    updateWalkAudio(false); jumpAudio.pause(); jumpAudio.currentTime=0;
+    avatar.position.set(0,0,2);avatar.rotation.y=0;y=0;vy=0;onGround=true;collected=0;won=false;
+    countEl.textContent='0';statusEl.textContent='Map vide · '+currentGame;banner.style.display='none';
+  }
+  document.getElementById('restart').addEventListener('click',resetGame);
+  function update(dt,t){
+    if(won)return;
+    const keyX=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0);
+    const keyY=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0);
+    let sx=moveX+keyX, sy=moveY+keyY;
+    const mag=Math.hypot(sx,sy);if(mag>1){sx/=mag;sy/=mag;}
+    moving=Math.abs(sx)+Math.abs(sy)>.12;
+    updateWalkAudio(moving && onGround && !won);
+    const speed=6.3;
+    // Déplacement relatif à la caméra : le haut du joystick avance dans la direction regardée.
+    // La caméra est derrière le personnage (+Z à yaw=0), donc son avant horizontal est (-sin(yaw), -cos(yaw)).
+    const forwardX=-Math.sin(cameraYaw),forwardZ=-Math.cos(cameraYaw);
+    const rightX=Math.cos(cameraYaw),rightZ=-Math.sin(cameraYaw);
+    const dx=(rightX*sx+forwardX*(-sy))*speed*dt;
+    const dz=(rightZ*sx+forwardZ*(-sy))*speed*dt;
+    avatar.position.x=Math.max(-21,Math.min(21,avatar.position.x+dx));avatar.position.z=Math.max(-15,Math.min(15,avatar.position.z+dz));
+    // Oriente le visage du personnage dans la direction réelle de son déplacement.
+    if(moving)avatar.rotation.y=Math.atan2(dx,dz);
+    const oldY=y;
+    if(!onGround){vy-=gravity*dt;y+=vy*dt;}
+    const feet=avatar.position.y+y;
+    if(vy<=0){
+      let landing=null;
+      for(const p of landings){
+        if(avatar.position.x>p.x-p.w/2+.05&&avatar.position.x<p.x+p.w/2-.05&&avatar.position.z>p.z-p.d/2+.05&&avatar.position.z<p.z+p.d/2-.05){
+          if(feet<=p.y+.8&&feet>=p.y-.45&&(!landing||p.y>landing.y))landing=p;
+        }
+      }
+      if(landing){y=landing.y;vy=0;onGround=true;}
+    }
+    avatar.position.y=y;
+    if (multiplayerSocket && multiplayerSocket.connected && performance.now()-lastNetworkSend>90) {
+      lastNetworkSend=performance.now();
+      multiplayerSocket.emit('move', {x:avatar.position.x, y:avatar.position.y, z:avatar.position.z});
+    }
+    // animation marche / repos / saut
+    if(moving&&onGround){walkPhase+=dt*10;leftLeg.rotation.x=Math.sin(walkPhase)*.62;rightLeg.rotation.x=-Math.sin(walkPhase)*.62;leftArm.rotation.x=-Math.sin(walkPhase)*.48;rightArm.rotation.x=Math.sin(walkPhase)*.48;avatar.position.y+=Math.abs(Math.sin(walkPhase*2))*.055;}
+    else if(!onGround){leftLeg.rotation.x=.18;rightLeg.rotation.x=-.18;leftArm.rotation.x=-.5;rightArm.rotation.x=-.5;}
+    else{leftLeg.rotation.x*=.75;rightLeg.rotation.x*=.75;leftArm.rotation.x*=.75;rightArm.rotation.x*=.75;avatar.position.y+=Math.sin(t*2.3)*.018;}
+    // Aucun cristal ni portail dans les maps.
+    // Chute = retour au départ
+    if(avatar.position.y < -8){avatar.position.set(0,0,2);y=0;vy=0;onGround=true;statusEl.textContent='Tu es revenu au départ.';}
+
+  }
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt=Math.min(clock.getDelta(),.04),t=clock.elapsedTime;
+    update(dt,t);
+    // caméra derrière le personnage
+    const dist=cameraDistance, targetY=avatar.position.y+1.6;
+    const horizontal=Math.cos(cameraPitch)*dist;
+    const camX=avatar.position.x+Math.sin(cameraYaw)*horizontal;
+    const camZ=avatar.position.z+Math.cos(cameraYaw)*horizontal;
+    camera.position.set(camX,targetY+Math.sin(cameraPitch)*dist+2,camZ);
+    camera.lookAt(avatar.position.x,avatar.position.y+1.25,avatar.position.z);
+    // Bulle de chat attachée visuellement au-dessus de la tête du personnage.
+    if(avatarChatBubble.style.display!=='none'){
+      if(performance.now()>bubbleUntil){avatarChatBubble.style.display='none';}
+      else{
+        const headPoint=new THREE.Vector3(avatar.position.x,avatar.position.y+3.55,avatar.position.z).project(camera);
+        const bx=(headPoint.x*.5+.5)*innerWidth;
+        const by=(-headPoint.y*.5+.5)*innerHeight;
+        const onScreen=headPoint.z>-1&&headPoint.z<1&&bx>0&&bx<innerWidth&&by>0&&by<innerHeight;
+        avatarChatBubble.style.display=onScreen?'block':'none';
+        if(onScreen){avatarChatBubble.style.left=bx+'px';avatarChatBubble.style.top=by+'px';}
+      }
+    }
+    // Le portail pulse visuellement
+
+    renderer.render(scene,camera);
+    if(document.getElementById('avatarEditor').style.display==='block'){previewAvatar.rotation.y+=dt*.22;previewRenderer.render(previewScene,previewCamera);}
+  }
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+  animate();
+})();
+</script>
+</body>
+</html>
